@@ -1,0 +1,178 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-lookism-bg text-lookism-text-main font-sans antialiased;
+    background-image: linear-gradient(180deg, #111111 0%, #18181B 50%, #1F2933 100%);
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+  /* Lookism Comic Panel */
+  .lookism-panel {
+    @apply relative bg-lookism-bg-panel border-3 border-lookism-border-muted rounded-none p-8;
+    box-shadow: 
+      0 10px 25px -5px rgba(0, 0, 0, 0.8),
+      inset 0 -2px 10px rgba(0, 0, 0, 0.5);
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .lookism-panel:hover {
+    @apply border-lookism-accent-cyan;
+    box-shadow: 
+      0 15px 35px -5px rgba(0, 0, 0, 0.9),
+      0 0 30px rgba(92, 225, 230, 0.3),
+      inset 0 -2px 10px rgba(0, 0, 0, 0.5);
+    transform: translateY(-2px);
+  }
+  
+  /* Episode Title (Lookism Chapter Style) */
+  .lookism-episode-title {
+    @apply font-display text-6xl md:text-7xl lg:text-8xl font-bold uppercase tracking-wider;
+    text-shadow: 
+      3px 3px 0px rgba(0, 0, 0, 0.8),
+      0 0 30px rgba(92, 225, 230, 0.5);
+    background: linear-gradient(135deg, #5CE1E6 0%, #FF3478 50%, #FACC15 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .lookism-section-title {
+    @apply font-heading text-4xl md:text-5xl font-bold uppercase tracking-wide text-lookism-text-main;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+  }
+  
+  /* Narration Box (Speech/Info Box) */
+  .lookism-speech {
+    @apply relative bg-lookism-bg-light border-l-6 border-lookism-accent-cyan p-6;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+  }
+  
+  .lookism-speech::before {
+    content: '';
+    @apply absolute left-0 top-0 bottom-0 w-1;
+    background: linear-gradient(180deg, #5CE1E6 0%, #FF3478 100%);
+  }
+  
+  /* SFX Tag */
+  .lookism-sfx {
+    @apply inline-block px-4 py-2 font-display text-lg font-bold uppercase tracking-widest;
+    @apply bg-lookism-bg-dark border-3 border-lookism-accent-pink text-lookism-accent-pink;
+    @apply transform -rotate-3;
+    text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.8);
+    box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.5);
+  }
+  
+  /* Neon Accent Text */
+  .neon-text {
+    @apply font-bold;
+    text-shadow: 
+      0 0 10px currentColor,
+      0 0 20px currentColor,
+      0 0 30px currentColor;
+  }
+  
+  .neon-cyan {
+    @apply text-lookism-accent-cyan neon-text;
+  }
+  
+  .neon-pink {
+    @apply text-lookism-accent-pink neon-text;
+  }
+  
+  .neon-yellow {
+    @apply text-lookism-accent-yellow neon-text;
+  }
+  
+  /* Dynamic Speed Lines */
+  .speed-lines {
+    background-image: 
+      linear-gradient(90deg, transparent 0%, rgba(92, 225, 230, 0.1) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: speed-line-move 3s linear infinite;
+  }
+  
+  @keyframes speed-line-move {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  
+  /* Urban Divider */
+  .lookism-divider {
+    @apply relative h-1 bg-gradient-to-r from-transparent via-lookism-accent-cyan to-transparent my-12;
+  }
+  
+  .lookism-divider::before {
+    content: '';
+    @apply absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2;
+    @apply w-3 h-3 bg-lookism-accent-cyan rotate-45;
+    box-shadow: 0 0 20px rgba(92, 225, 230, 0.8);
+  }
+  
+  /* Skill Badge */
+  .skill-badge-lookism {
+    @apply inline-block px-4 py-2 bg-lookism-bg-dark border-2 border-lookism-border-muted text-lookism-text-main font-semibold text-sm;
+    @apply transition-all duration-200 hover:border-lookism-accent-cyan hover:text-lookism-accent-cyan hover:shadow-lookism-glow-cyan;
+  }
+  
+  /* Button Styles */
+  .btn-lookism-primary {
+    @apply px-8 py-4 font-heading text-lg font-bold uppercase tracking-wide;
+    @apply bg-gradient-to-r from-lookism-accent-cyan to-lookism-accent-blue text-lookism-bg-dark;
+    @apply border-3 border-lookism-border-strong;
+    @apply transition-all duration-200 hover:shadow-lookism-glow-cyan hover:scale-105;
+    text-shadow: none;
+  }
+  
+  .btn-lookism-secondary {
+    @apply px-8 py-4 font-heading text-lg font-bold uppercase tracking-wide;
+    @apply bg-lookism-bg-dark text-lookism-accent-cyan border-3 border-lookism-accent-cyan;
+    @apply transition-all duration-200 hover:bg-lookism-accent-cyan hover:text-lookism-bg-dark hover:shadow-lookism-glow-cyan;
+  }
+  
+  /* Stat Box (Character Stats) */
+  .stat-box-lookism {
+    @apply bg-lookism-bg-dark border-l-6 border-lookism-accent-yellow p-4;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Background grain/noise effect */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #111111;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #5CE1E6 0%, #FF3478 100%);
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #FF3478 0%, #FACC15 100%);
+}
