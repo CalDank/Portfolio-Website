@@ -110,6 +110,45 @@
     font:500 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#9B958A}
   #readout b{color:var(--brass);font-weight:600}
 
+  /* ---- editor drawer ---- */
+  #edit{position:fixed;top:70px;right:14px;bottom:64px;width:266px;z-index:41;
+    display:none;flex-direction:column;gap:8px;
+    background:rgba(20,24,31,.90);backdrop-filter:blur(12px);
+    border:1px solid var(--line);border-radius:10px;padding:10px}
+  #edit.on{display:flex}
+  #edit h3{margin:0;font:700 10px/1 "Inter",system-ui,sans-serif;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--brass)}
+  #edit .row{display:flex;gap:6px;flex-wrap:wrap}
+  #edit button{flex:1 1 auto;appearance:none;border:1px solid var(--line);border-radius:6px;
+    padding:6px 8px;cursor:pointer;background:rgba(255,255,255,.05);color:#CFCABF;
+    font:600 10px/1.2 "Inter",system-ui,sans-serif;letter-spacing:.05em;
+    text-transform:uppercase;transition:.12s;white-space:nowrap}
+  #edit button:hover{background:rgba(255,255,255,.12);color:#fff}
+  #edit button.warn:hover{background:#7A2E28;border-color:#7A2E28;color:#fff}
+  #edit button.on{background:var(--brass);color:#1B1206;border-color:var(--brass)}
+  #edit button:disabled{opacity:.35;cursor:default;background:transparent}
+  #palette{overflow-y:auto;flex:1 1 auto;margin:0 -4px;padding:0 4px;min-height:80px}
+  #palette .grp{font:600 9px/1 "Inter",system-ui,sans-serif;letter-spacing:.14em;
+    text-transform:uppercase;color:#6E6A62;margin:9px 0 4px}
+  #palette .it{display:block;width:100%;text-align:left;border:0;border-radius:5px;
+    padding:5px 7px;margin-bottom:2px;cursor:pointer;background:transparent;
+    color:#CFCABF;font:500 11px/1.3 "Inter",system-ui,sans-serif;text-transform:none;
+    letter-spacing:0}
+  #palette .it:hover{background:rgba(176,141,87,.22);color:#fff}
+  #props{border-top:1px solid var(--line);padding-top:8px;font-size:11px;color:#9B958A}
+  #props .name{color:#E8E4DC;font-weight:600;font-size:12px;margin-bottom:6px}
+  #props label{display:flex;align-items:center;gap:5px;margin-bottom:4px;
+    font:500 10px/1 ui-monospace,monospace;color:#7E796F}
+  #props input{flex:1;min-width:0;background:rgba(0,0,0,.35);border:1px solid var(--line);
+    border-radius:4px;color:#E8E4DC;padding:4px 6px;font:500 11px/1 ui-monospace,monospace}
+  #props .none{color:#6E6A62;font-style:italic}
+  #ehint{font:500 10px/1.5 "Inter",system-ui,sans-serif;color:#6E6A62}
+  #ehint b{color:#9B958A;font-weight:600}
+  #clashes{font:600 10px/1.4 "Inter",system-ui,sans-serif;letter-spacing:.04em;
+    text-transform:uppercase}
+  #clashes.ok{color:#5FA372}
+  #clashes.bad{color:#E2564B}
+
   /* ---- webgl failure ---- */
   #fail{position:fixed;inset:0;z-index:90;display:none;place-items:center;
     background:#0E1116;padding:40px;text-align:center}
@@ -126,6 +165,35 @@
   <button id="b1" class="on"><b>1</b>Walk</button>
   <button id="b2"><b>2</b>Top</button>
   <button id="b3"><b>3</b>Orbit</button>
+  <button id="bEdit"><b>E</b>Edit</button>
+</div>
+
+<div id="edit">
+  <h3>Layout editor</h3>
+  <div class="row">
+    <button id="eMove" class="on" title="Drag to slide across the floor">Move</button>
+    <button id="eTurn" title="Drag the ring to spin">Turn</button>
+    <button id="eSnap" class="on" title="Snap to 50 mm and 15&deg;">Snap</button>
+  </div>
+  <div class="row">
+    <button id="eUndo" title="Ctrl+Z">Undo</button>
+    <button id="eRedo" title="Ctrl+Shift+Z">Redo</button>
+  </div>
+  <div id="clashes" class="ok">&nbsp;</div>
+  <div id="props"><div class="none">Nothing selected &mdash; click a piece.</div></div>
+  <h3>Add a piece</h3>
+  <div id="palette"></div>
+  <div class="row">
+    <button id="eExport">Export</button>
+    <button id="eImport">Import</button>
+    <button id="eReset" class="warn">Reset</button>
+  </div>
+  <div id="ehint">
+    <b>Drag</b> the arrows to move, the ring to spin.<br>
+    <b>Del</b> remove &middot; <b>Ctrl+D</b> duplicate &middot; <b>Esc</b> deselect<br>
+    Saves to this browser automatically.
+  </div>
+  <input type="file" id="eFile" accept="application/json,.json" hidden>
 </div>
 
 <div id="plate">
@@ -149,7 +217,7 @@
   <span>WASD to move &middot; mouse to look &middot; Shift to run &middot; Esc to release</span></div></div>
 
 <div id="help">
-  <kbd>1</kbd> walk &nbsp; <kbd>2</kbd> top &nbsp; <kbd>3</kbd> orbit
+  <kbd>1</kbd> walk &nbsp; <kbd>2</kbd> top &nbsp; <kbd>3</kbd> orbit &nbsp; <kbd>E</kbd> edit
   &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move
   &nbsp;&middot;&nbsp; <kbd>Shift</kbd> run &nbsp;&middot;&nbsp; <kbd>Esc</kbd> release cursor
 </div>
@@ -166,6 +234,7 @@
 import * as THREE from 'three';
 import { OrbitControls }        from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls }  from 'three/addons/controls/PointerLockControls.js';
+import { TransformControls }    from 'three/addons/controls/TransformControls.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 
 /* ==========================================================================
@@ -1177,8 +1246,149 @@ function deskPlant(){
   return g;
 }
 
+/* ---- composites -----------------------------------------------------------
+   These pieces used to be drawn straight into world coordinates with slab().
+   For the layout to be editable every movable thing has to be authored in
+   LOCAL space instead, origin at the footprint centre, facing +Y, so it can be
+   dropped anywhere and spun. `lslab` is the local-space twin of `slab`.       */
+function lslab(g, x0, x1, y0, y1, z0, z1, mat){
+  g.add(lbox(x1-x0, y1-y0, z1-z0, mat, (x0+x1)/2, (y0+y1)/2, z0));
+  return g;
+}
+/** A screen on a stalk. The panel faces local -Y, i.e. whoever sits in front. */
+function laptopProp(open = -0.30){
+  const g = new THREE.Group();
+  g.add(lbox(0.330,0.235,0.016,MAT.steel,0,0,0));
+  const lid = lbox(0.330,0.014,0.225,MAT.steel,0,-0.112,0.016);
+  lid.rotation.x = open; g.add(lid);
+  return g;
+}
+/** Bench desk + monitor + keyboard as one movable unit. The occupant stands
+    at local -Y, so the monitor sits at the back edge facing them. Previously
+    the monitor was placed separately and 180° out, showing its back. */
+function workstation(standing = false){
+  const g = new THREE.Group();
+  const h = standing ? DIM.DESK_H_STAND : DIM.DESK_H;
+  g.add(benchDesk(h));
+  const mon = monitor(0.560, 0.335);
+  mon.position.set(0, h, DIM.DESK_D/2 - 0.14);
+  g.add(mon);
+  g.add(lbox(0.420,0.140,0.018,MAT.lamDk,0,0,h));               // keyboard
+  return g;
+}
+function confTable6(){
+  const g = new THREE.Group(), tw = 2.40, td = 1.05, th = DIM.TABLE_H;
+  lslab(g, -tw/2, tw/2, -td/2, td/2, th-0.032, th, MAT.walnut);
+  lslab(g, -tw/2+0.02, tw/2-0.02, -td/2+0.02, td/2-0.02, th-0.045, th-0.032, MAT.frame);
+  for (const s of [-1,1])
+    lslab(g, s*0.90-0.030, s*0.90+0.030, -0.42, 0.42, 0, th-0.045, MAT.navy);
+  lslab(g, -0.90, 0.90, -0.045, 0.045, 0.30, 0.36, MAT.frame);   // cable spine
+  lslab(g, -0.16, 0.16, -0.055, 0.055, th, th+0.012, MAT.brass);  // grommet
+  for (const [dx,dy] of [[-0.55,-0.28],[0.55,0.28],[-0.55,0.28],[0.55,-0.28]])
+    lslab(g, dx-0.10, dx+0.10, dy-0.07, dy+0.07, th, th+0.010, MAT.lam);
+  g.add(post(0.98, 0.30, th, th+0.235, 0.048, 0.040, MAT.glassIn, 14));
+  for (const s of [-1,1])
+    g.add(post(0.86, s*0.10, th, th+0.095, 0.032, 0.034, MAT.glassIn, 12));
+  return g;
+}
+/** Executive desk with its kit. Like every other piece here the occupant sits
+    at local -Y, and the 1.7 m dimension is the desk's LONG axis along local X —
+    they sit along the long side, not at the end. */
+function execDesk(){
+  const g = new THREE.Group(), w = 1.700, d = 0.850, h = 0.750;
+  lslab(g, -w/2, w/2, -d/2, d/2, h-0.034, h, MAT.walnut);
+  for (const x of [-w/2+0.085, w/2-0.085])                        // navy blade legs
+    lslab(g, x-0.028, x+0.028, -d/2+0.03, d/2-0.03, 0, h-0.034, MAT.navy);
+  lslab(g, -w/2+0.14, w/2-0.14, d/2-0.055, d/2-0.030, 0.300, h-0.120, MAT.navy); // modesty
+  lslab(g, -w/2-0.010, w/2+0.010, -d/2-0.010, -d/2-0.002, h-0.034, h, MAT.brass);
+  const lap = laptopProp(); lap.rotation.y = Math.PI;             // lid away, screen to user
+  lap.position.set(0, h, 0.04); g.add(lap);
+  lslab(g, -0.62, -0.38, -0.20, 0.06, h, h+0.020, MAT.lam);       // papers
+  g.add(post(0.62, 0.22, h, h+0.018, 0.070, 0.070, MAT.brass, 14));   // brass task lamp
+  g.add(post(0.62, 0.22, h+0.018, h+0.430, 0.014, 0.014, MAT.brass, 10));
+  g.add(post(0.62, 0.16, h+0.360, h+0.440, 0.075, 0.045, MAT.brass, 14));
+  return g;
+}
+function roundTable(r = 0.425){
+  const g = new THREE.Group(), h = DIM.TABLE_H;
+  g.add(post(0, 0, 0, 0.030, 0.310, 0.290, MAT.frame, 24));
+  g.add(post(0, 0, 0.030, h-0.032, 0.058, 0.052, MAT.frame, 16));
+  g.add(post(0, 0, h-0.032, h, r, r, MAT.walnut, 32));
+  for (const s of [-1,1]) g.add(post(s*0.15, s*0.09, h, h+0.088, 0.040, 0.040, MAT.lam, 14));
+  return g;
+}
+function coffeeTable(){
+  const g = new THREE.Group();
+  g.add(lbox(0.900,0.550,0.040,MAT.walnut,0,0,0.340));
+  g.add(lbox(0.820,0.470,0.022,MAT.walnut,0,0,0.150));
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    g.add(post(sx*0.395, sy*0.220, 0, 0.345, 0.016, 0.014, MAT.brass, 8));
+  g.add(lbox(0.220,0.170,0.030,std({color:0x8B2E2E,roughness:0.7}),-0.16,0.03,0.380));
+  return g;
+}
+function sideTable(){
+  const g = new THREE.Group();
+  g.add(lbox(0.500,0.500,0.030,MAT.walnut,0,0,0.470));
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    g.add(post(sx*0.215, sy*0.215, 0, 0.475, 0.016, 0.014, MAT.brass, 8));
+  const p = deskPlant(); p.position.y = 0.500; g.add(p);
+  return g;
+}
+function printerBay(){
+  const g = new THREE.Group();
+  g.add(lbox(0.700,0.600,0.760,MAT.lam,0,0,0));
+  g.add(lbox(0.620,0.520,0.290,MAT.lamDk,0,0,0.760));
+  g.add(lbox(0.560,0.360,0.030,MAT.lam,0,0.06,1.050));
+  g.add(lbox(0.180,0.020,0.070,MAT.screenOff,0.20,0.26,0.890));
+  return g;
+}
+function shredderUnit(){
+  const g = new THREE.Group();
+  g.add(lbox(0.400,0.340,0.530,MAT.lamDk,0,0,0));
+  g.add(lbox(0.420,0.360,0.140,MAT.frame,0,0,0.530));
+  g.add(lbox(0.230,0.020,0.012,MAT.screenOff,0,0,0.665));
+  return g;
+}
+function coffeeMachine(){
+  const g = new THREE.Group();
+  g.add(lbox(0.280,0.380,0.400,MAT.lamDk,0,0,0));
+  g.add(lbox(0.200,0.060,0.075,MAT.steel,0,-0.16,0.180));
+  g.add(lbox(0.230,0.300,0.022,MAT.steel,0,0.03,0.400));
+  return g;
+}
+function acousticScreen(len = 3.45){
+  const g = new THREE.Group(), t = DIM.SCREEN_T, z0 = DIM.DESK_H, z1 = z0 + DIM.SCREEN_H;
+  lslab(g, -len/2, len/2, -t/2, t/2, z0, z1, MAT.fabricDk);
+  lslab(g, -len/2, len/2, -t/2-0.004, t/2+0.004, z1-0.014, z1, MAT.brass);
+  return g;
+}
+/** 1.2 x 1.2 phone / video booth. Door on local +Y. */
+function phoneBooth(){
+  const g = new THREE.Group(), a = DIM.BOOTH/2, bh = DIM.BOOTH_H, t = 0.075;
+  lslab(g, -a,  a, -a, -a+t, 0, bh, MAT.lamDk);                  // back
+  lslab(g, -a, -a+t, -a, a, 0, bh, MAT.lamDk);                   // west
+  lslab(g,  a-t, a, -a, a, 0, bh, MAT.lamDk);                    // east
+  lslab(g, -a,  a,  a-t, a, 0, 0.35, MAT.lamDk);                 // door base rail
+  lslab(g, -a, -a+t, a-t, a, 0, bh, MAT.frame);                  // jambs
+  lslab(g,  a-t, a,  a-t, a, 0, bh, MAT.frame);
+  lslab(g, -a,  a,  a-t, a, 2.16, bh, MAT.frame);                // door head
+  lslab(g, -a+t, a-t, a-0.048, a-0.030, 0.35, 2.16, MAT.glassIn);// glazed leaf
+  lslab(g, -a,  a, -a, a, bh, bh+0.055, MAT.lamDk);              // roof
+  lslab(g, -a+0.30, a-0.30, -a+0.30, a-0.30, bh-0.030, bh-0.012, MAT.fixture);
+  lslab(g, -a+t, a-t, -a+t, -a+t+0.012, 0, bh-0.06, MAT.navy);   // felt lining
+  lslab(g, -a+t, a-t, -a+t, -a+0.50, 1.020, 1.058, MAT.oak);     // ledge
+  const s = stool(); s.position.set(0, 0, -a+0.72); g.add(s);
+  return g;
+}
+
 /* ==========================================================================
-   5b. PLACEMENT
+   5b. CATALOGUE AND LAYOUT
+   --------------------------------------------------------------------------
+   The fit-out is data, not code. Built-in joinery that is dimensioned to the
+   architecture — the reception counter, the pantry run, the touchdown ledge —
+   stays fixed. Everything a person could actually push around is a CATALOG
+   type plus a row in DEFAULT_LAYOUT, which the editor in section 8b mutates
+   and section 5c renders.
    ========================================================================== */
 
 /* ---- Reception & waiting ------------------------------------------------
@@ -1199,56 +1409,21 @@ function deskPlant(){
   for (const x of [x0+0.12, (x0+x1)/2, x1-0.12])
     G_FURN.add(slab(x-0.018, x+0.018, y1-0.075, y1-0.035, h+0.032, 1.060, MAT.brass,
                     { collide:false }));
-  addCollider(x0-0.05, x1+0.05, y0-0.02, y1, 0, 1.095, 'reception_counter', 'furn');
-  // desktop kit
-  place(monitor(0.520,0.310), 2.05, 3.36, 180);
+  addCollider(x0-0.05, x1+0.05, y0-0.02, y1, 0, 1.095, 'reception_counter', 'fixture');
+  // desktop kit. The monitor faces the visitor side (local -Y, so deg 0) —
+  // it was previously placed at 180 and showed the receptionist its back.
+  place(monitor(0.520,0.310), 2.05, 3.36, 0);
   G_FURN.add(slab(1.42, 1.58, 3.28, 3.44, h+0.032, h+0.062, MAT.lamDk, { collide:false })); // phone
   place(deskPlant(), 2.78, 3.34, 0);
-  place(taskChair(), 2.10, 2.76, 0, [0.62,0.62,1.10], 'reception_chair');
-
-  // waiting group, tucked north of the entrance against the corridor wall
-  place(sofa2(), 0.45, 6.15, 270, [1.60,0.80,0.78], 'waiting_sofa');
-  place(armChair(), 2.15, 6.50, 215, [0.80,0.80,0.70], 'waiting_armchair');
-  const ct = new THREE.Group();
-  ct.add(lbox(0.900,0.550,0.040,MAT.walnut,0,0,0.340));
-  ct.add(lbox(0.820,0.470,0.022,MAT.walnut,0,0,0.150));
-  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
-    ct.add(post(sx*0.395, sy*0.220, 0, 0.345, 0.016, 0.014, MAT.brass, 8));
-  ct.add(lbox(0.220,0.170,0.030,std({color:0x8B2E2E,roughness:0.7}),-0.16,0.03,0.380));
-  place(ct, 1.50, 5.78, 0, [0.90,0.55,0.38], 'coffee_table');
-  place(planter(0.260, 0.520, 1.150), 2.78, 5.62, 0, [0.52,0.52,1.60], 'planter_reception');
-
   // entrance mat
   G_FURN.add(plane(0.02, 1.10, ENTRY_A+0.06, ENTRY_C-0.66, 0.010, MAT.fabricDk));
 })();
 
-/* ---- Document & compliance store ---------------------------------------
-   Windowless back-of-house on the corridor wall: passport and visa files
-   locked away, the printer bay and the shredder out of the client's sight. -*/
-(function store(){
-  for (let i=0;i<4;i++)
-    place(fileCabinet(), 0.30 + i*0.495, 0.335, 0, [DIM.FILE_W, DIM.FILE_D, DIM.FILE_H],
-          'file_cabinet_'+i);
-  place(shelving(1.150, 0.340, 2.000, 5), 2.775, 1.500, 90, [1.15,0.34,2.00], 'store_shelving');
-  // printer / scanner bay
-  const pr = new THREE.Group();
-  pr.add(lbox(0.700,0.600,0.760,MAT.lam,0,0,0));
-  pr.add(lbox(0.620,0.520,0.290,MAT.lamDk,0,0,0.760));
-  pr.add(lbox(0.560,0.360,0.030,MAT.lam,0,0.06,1.050));
-  pr.add(lbox(0.180,0.020,0.070,MAT.screenOff,0.20,0.26,0.890));
-  place(pr, 2.42, 0.360, 0, [0.70,0.60,1.05], 'printer_bay');
-  // shredder + bin
-  const sh = new THREE.Group();
-  sh.add(lbox(0.400,0.340,0.530,MAT.lamDk,0,0,0));
-  sh.add(lbox(0.420,0.360,0.140,MAT.frame,0,0,0.530));
-  sh.add(lbox(0.230,0.020,0.012,MAT.screenOff,0,0,0.665));
-  place(sh, 1.62, 1.98, 0, [0.42,0.36,0.67], 'shredder');
-})();
-
-/* ---- Pantry nook -------------------------------------------------------- */
+/* ---- Pantry nook: fixed joinery only ------------------------------------ */
 (function pantry(){
   const cy1 = D, cy0 = D - DIM.COUNTER_D, h = DIM.COUNTER_H;
-  G_FURN.add(slab(0.10, 2.90, cy0, cy1, 0.090, h-0.035, MAT.lam, { name:'pantry_counter' }));
+  G_FURN.add(slab(0.10, 2.90, cy0, cy1, 0.090, h-0.035, MAT.lam,
+                  { name:'pantry_counter', kind:'fixture' }));
   G_FURN.add(slab(0.14, 2.86, cy0+0.06, cy1, 0, 0.090, MAT.lamDk, { collide:false }));
   // Worktop, built as four strips around the sink cut-out — a single slab would
   // bury the basin under it.
@@ -1281,65 +1456,30 @@ function deskPlant(){
   G_FURN.add(slab(0.975, 1.005, cy1-0.30, cy1-0.14, h+0.255, h+0.275, MAT.brass, { collide:false }));
   // upper cabinets — high-level joinery, so they live in G_ABOVE and drop out
   // of the plan view rather than hiding the counter below them
-  G_ABOVE.add(slab(0.10, 2.50, cy1-0.350, cy1, 1.500, 2.200, MAT.lam, { name:'pantry_uppers' }));
+  G_ABOVE.add(slab(0.10, 2.50, cy1-0.350, cy1, 1.500, 2.200, MAT.lam,
+                   { name:'pantry_uppers', kind:'fixture' }));
   for (let i=0;i<4;i++){
     const x = 0.13 + i*0.590;
     G_ABOVE.add(slab(x, x+0.565, cy1-0.362, cy1-0.352, 1.512, 2.188, MAT.walnut, { collide:false }));
     G_ABOVE.add(slab(x+0.25, x+0.32, cy1-0.374, cy1-0.360, 1.545, 1.565, MAT.brass, { collide:false }));
   }
   // coffee machine + mugs
-  const cm = new THREE.Group();
-  cm.add(lbox(0.280,0.380,0.400,MAT.lamDk,0,0,0));
-  cm.add(lbox(0.200,0.060,0.075,MAT.steel,0,-0.16,0.180));
-  cm.add(lbox(0.230,0.300,0.022,MAT.steel,0,0.03,0.400));
-  place(cm, 1.90, cy0+0.30, 180, null);
+  place(coffeeMachine(), 1.90, cy0+0.30, 180, null);
   for (let i=0;i<3;i++)
     G_FURN.add(post(1.44+i*0.10, cy0+0.44, h, h+0.085, 0.038, 0.038, MAT.lam, 12));
-  // narrow standing ledge + two stools, against the corridor wall
-  G_FURN.add(slab(0.02, 0.42, 7.40, 8.60, 1.020, 1.058, MAT.walnut, { name:'pantry_ledge' }));
+  // narrow standing ledge against the corridor wall
+  G_FURN.add(slab(0.02, 0.42, 7.40, 8.60, 1.020, 1.058, MAT.walnut,
+                  { name:'pantry_ledge', kind:'fixture' }));
   for (const y of [7.60, 8.40])
     G_FURN.add(slab(0.04, 0.30, y-0.020, y+0.020, 0.900, 1.020, MAT.brass, { collide:false }));
-  place(stool(), 0.72, 7.66, 90, [0.36,0.36,0.72], 'pantry_stool_1');
-  place(stool(), 0.72, 8.34, 90, [0.36,0.36,0.72], 'pantry_stool_2');
 })();
 
-/* ---- Flex bay: phone booth, touchdown ledge, planting ------------------- */
-(function flex(){
-  // --- 1.2 x 1.2 phone / video booth, freestanding, door on the spine side
-  const bx0=3.15, bx1=4.35, by0=2.45, by1=3.65, bh=DIM.BOOTH_H, t=0.075;
-  const g = new THREE.Group();
-  const P = (x0,x1,y0,y1,z0,z1,m)=>G_FURN.add(slab(x0,x1,y0,y1,z0,z1,m,{collide:false}));
-  P(bx0,bx1,by0,by0+t,0,bh,MAT.lamDk);                       // back (south)
-  P(bx0,bx0+t,by0,by1,0,bh,MAT.lamDk);                       // west
-  P(bx1-t,bx1,by0,by1,0,bh,MAT.lamDk);                       // east
-  P(bx0,bx1,by1-t,by1,0,0.35,MAT.lamDk);                     // door: base rail
-  P(bx0,bx0+t,by1-t,by1,0,bh,MAT.frame);
-  P(bx1-t,bx1,by1-t,by1,0,bh,MAT.frame);
-  P(bx0,bx1,by1-t,by1,2.16,bh,MAT.frame);                    // door head
-  P(bx0+t,bx1-t,by1-0.048,by1-0.030,0.35,2.16,MAT.glassIn);  // glazed leaf
-  P(bx0,bx1,by0,by1,bh,bh+0.055,MAT.lamDk);                  // roof + extract
-                                                             // (dark, so in plan
-                                                             // it reads as joinery
-                                                             // and not as structure)
-  P(bx0+0.30,bx1-0.30,by0+0.30,by1-0.30,bh-0.030,bh-0.012,MAT.fixture);
-  // navy acoustic felt lining, inside
-  P(bx0+t,bx1-t,by0+t,by0+t+0.012,0,bh-0.06,MAT.navy);
-  // ledge + perch stool inside
-  P(bx0+t,bx1-t,by0+t,by0+0.50,1.020,1.058,MAT.oak);
-  addCollider(bx0,bx1,by0,by1,0,bh,'phone_booth','furn');
-  place(stool(), (bx0+bx1)/2, by0+0.72, 0, null);
-  G_FURN.add(g);
-
-  // --- touchdown ledge against demising wall 71
-  G_FURN.add(slab(4.60, 6.00, 0.02, 0.44, 1.020, 1.058, MAT.oak, { name:'touchdown_ledge' }));
+/* ---- Flex bay: the touchdown ledge is built in; the booth is not -------- */
+(function flexFixed(){
+  G_FURN.add(slab(4.60, 6.00, 0.02, 0.44, 1.020, 1.058, MAT.oak,
+                  { name:'touchdown_ledge', kind:'fixture' }));
   for (const x of [4.72, 5.88])
     G_FURN.add(slab(x-0.020, x+0.020, 0.06, 0.40, 0.020, 1.020, MAT.frame, { collide:false }));
-  place(stool(), 4.95, 0.76, 180, [0.36,0.36,0.72], 'flex_stool_1');
-  place(stool(), 5.65, 0.76, 180, [0.36,0.36,0.72], 'flex_stool_2');
-
-  // --- planting
-  place(planter(0.300, 0.560, 1.200), 4.88, 3.28, 0, [0.60,0.60,1.70], 'planter_flex');
-  place(planter(0.230, 0.440, 0.780), 6.28, 0.58, 0, [0.46,0.46,1.20], 'planter_flex_2');
 })();
 
 /* ---- Open workstations --------------------------------------------------
@@ -1351,66 +1491,124 @@ const BENCH_X = [3.675, 4.825, 5.975];       // desk centres, 1.15 m module
 const BENCH_S = { top0: 6.15, top1: 6.90, chair: 5.80, ped: 6.545, face:   0 };
 const BENCH_N = { top0: 6.90, top1: 7.65, chair: 8.00, ped: 7.285, face: 180 };
 
-(function openArea(){
-  for (const B of [BENCH_S, BENCH_N]){
-    const cy = (B.top0 + B.top1)/2;
-    BENCH_X.forEach((cx, i) => {
-      // the centre desk of the north bench is modelled raised, to read as sit-stand
-      const standing = (B === BENCH_N && i === 1);
-      const h = standing ? DIM.DESK_H_STAND : DIM.DESK_H;
-      place(benchDesk(h), cx, cy, 0, [DIM.DESK_W, DIM.DESK_D, h], 'desk_'+(B.face)+'_'+i);
-      // monitor sits at the screen edge of the desk, facing the occupant
-      const my = B.face === 0 ? B.top1 - 0.14 : B.top0 + 0.14;
-      const mon = monitor(0.560, 0.335); mon.position.y = h;
-      place(mon, cx, my, B.face === 0 ? 180 : 0);
-      // keyboard
-      G_FURN.add(slab(cx-0.21, cx+0.21, cy-0.07, cy+0.07, h, h+0.018, MAT.lamDk,
-                      { collide:false }));
-      place(pedestal(), cx + 0.32, B.ped, 0, [DIM.PED_W, DIM.PED_D, DIM.PED_H],
-            'pedestal_'+(B.face)+'_'+i);
-      place(taskChair(i === 1 ? MAT.fabricDk : MAT.fabric), cx, B.chair, B.face,
-            [0.62,0.62,1.10], 'task_chair_'+(B.face)+'_'+i);
-      if (i !== 1) place(deskPlant(), cx + (B.face === 0 ? 0.44 : -0.44), my, 0);
-    });
-  }
-  // 350 mm acoustic screen along the shared edge
-  const y = (BENCH_S.top1 + BENCH_N.top0)/2;
-  G_FURN.add(slab(3.10, 6.55, y - DIM.SCREEN_T/2, y + DIM.SCREEN_T/2,
-                  DIM.DESK_H, DIM.DESK_H + DIM.SCREEN_H, MAT.fabricDk,
-                  { name:'acoustic_screen' }));
-  G_FURN.add(slab(3.10, 6.55, y - DIM.SCREEN_T/2 - 0.004, y + DIM.SCREEN_T/2 + 0.004,
-                  DIM.DESK_H + DIM.SCREEN_H - 0.014, DIM.DESK_H + DIM.SCREEN_H,
-                  MAT.brass, { collide:false }));
-  // a laptop and a folder, so the bench does not look showroom-empty
-  const lap = new THREE.Group();
-  lap.add(lbox(0.325,0.230,0.016,MAT.steel,0,0,0));
-  const lid = lbox(0.325,0.014,0.220,MAT.steel,0,-0.112,0.016); lid.rotation.x = -0.30; lap.add(lid);
-  place(lap, BENCH_X[0], 6.36, 0).position.y = DIM.DESK_H;
-  G_FURN.add(slab(BENCH_X[2]-0.14, BENCH_X[2]+0.14, 7.36, 7.56,
-                  DIM.DESK_H, DIM.DESK_H+0.012, MAT.lam, { collide:false }));
-})();
+/* ---- The catalogue -----------------------------------------------------
+   Every movable type: a display name, the category it files under in the
+   editor palette, its plan footprint [w, d, h] for collision and clash
+   checking, and a factory that builds it in local space facing +Y. -------- */
+const CATALOG = {
+  workstation      : { name:'Sit-stand desk',      cat:'Desks',    foot:[DIM.DESK_W, DIM.DESK_D, DIM.DESK_H],       make:()=>workstation(false) },
+  workstation_std  : { name:'Desk, raised',        cat:'Desks',    foot:[DIM.DESK_W, DIM.DESK_D, DIM.DESK_H_STAND], make:()=>workstation(true)  },
+  exec_desk        : { name:'Executive desk',      cat:'Desks',    foot:[1.70, 0.85, 0.75],  make:()=>execDesk() },
+  conf_table       : { name:'Table, 6-seat',       cat:'Desks',    foot:[2.40, 1.05, 0.74],  make:()=>confTable6() },
+  round_table      : { name:'Round table',         cat:'Desks',    foot:[0.85, 0.85, 0.74],  make:()=>roundTable() },
+  coffee_table     : { name:'Coffee table',        cat:'Desks',    foot:[0.90, 0.55, 0.38],  make:()=>coffeeTable() },
+  side_table       : { name:'Side table',          cat:'Desks',    foot:[0.50, 0.50, 0.50],  make:()=>sideTable() },
 
-/* ---- Client meeting room ------------------------------------------------ */
-(function meeting(){
-  const cx = 8.55, cy = 1.95, tw = 2.40, td = 1.05, th = DIM.TABLE_H;
-  G_FURN.add(slab(cx-tw/2, cx+tw/2, cy-td/2, cy+td/2, th-0.032, th, MAT.walnut,
-                  { name:'conference_table' }));
-  G_FURN.add(slab(cx-tw/2+0.02, cx+tw/2-0.02, cy-td/2+0.02, cy+td/2-0.02,
-                  th-0.045, th-0.032, MAT.frame, { collide:false }));
-  for (const s of [-1,1])                                   // navy blade legs
-    G_FURN.add(slab(cx+s*0.90-0.030, cx+s*0.90+0.030, cy-0.42, cy+0.42, 0, th-0.045,
-                    MAT.navy, { collide:false }));
-  G_FURN.add(slab(cx-0.90, cx+0.90, cy-0.045, cy+0.045, 0.30, 0.36, MAT.frame,
-                  { collide:false }));                      // cable spine
-  // power / data grommet
-  G_FURN.add(slab(cx-0.16, cx+0.16, cy-0.055, cy+0.055, th, th+0.012, MAT.brass,
-                  { collide:false }));
-  for (let i=0;i<6;i++){
-    const x = [7.75, 8.55, 9.35][i%3];
-    const y = i < 3 ? 0.90 : 3.00;
-    place(confChair(), x, y, i < 3 ? 0 : 180, [0.56,0.56,0.98], 'conf_chair_'+i);
-  }
-  // wall display + soundbar on the solid AV pier
+  task_chair       : { name:'Task chair',          cat:'Seating',  foot:[0.62, 0.62, 1.10],  make:()=>taskChair(MAT.fabric) },
+  task_chair_dk    : { name:'Task chair, dark',    cat:'Seating',  foot:[0.62, 0.62, 1.10],  make:()=>taskChair(MAT.fabricDk) },
+  exec_chair       : { name:'Executive chair',     cat:'Seating',  foot:[0.62, 0.62, 1.10],  make:()=>taskChair(MAT.leather) },
+  conf_chair       : { name:'Conference chair',    cat:'Seating',  foot:[0.56, 0.56, 0.98],  make:()=>confChair(MAT.fabricDk) },
+  conf_chair_lt    : { name:'Meeting chair, light',cat:'Seating',  foot:[0.56, 0.56, 0.98],  make:()=>confChair(MAT.fabric) },
+  armchair         : { name:'Armchair',            cat:'Seating',  foot:[0.80, 0.80, 0.70],  make:()=>armChair() },
+  sofa2            : { name:'Sofa, 2-seat',        cat:'Seating',  foot:[1.60, 0.80, 0.78],  make:()=>sofa2() },
+  stool            : { name:'Stool',               cat:'Seating',  foot:[0.36, 0.36, 0.72],  make:()=>stool() },
+
+  pedestal         : { name:'Mobile pedestal',     cat:'Storage',  foot:[DIM.PED_W, DIM.PED_D, DIM.PED_H], make:()=>pedestal() },
+  file_cabinet     : { name:'Filing cabinet',      cat:'Storage',  foot:[DIM.FILE_W, DIM.FILE_D, DIM.FILE_H], make:()=>fileCabinet() },
+  shelving         : { name:'Shelving, 1.0 m',     cat:'Storage',  foot:[1.00, 0.35, 2.00],  make:()=>shelving(1.000, 0.350, 2.000, 5) },
+  shelving_wide    : { name:'Shelving, 1.15 m',    cat:'Storage',  foot:[1.15, 0.34, 2.00],  make:()=>shelving(1.150, 0.340, 2.000, 5) },
+  credenza         : { name:'Credenza',            cat:'Storage',  foot:[1.60, 0.45, 0.72],  make:()=>credenza(1.600, 0.450, 0.720) },
+  printer          : { name:'Printer / scanner',   cat:'Storage',  foot:[0.70, 0.60, 1.05],  make:()=>printerBay() },
+  shredder         : { name:'Shredder',            cat:'Storage',  foot:[0.42, 0.36, 0.67],  make:()=>shredderUnit() },
+
+  phone_booth      : { name:'Phone booth',         cat:'Rooms',    foot:[DIM.BOOTH, DIM.BOOTH, DIM.BOOTH_H], make:()=>phoneBooth() },
+  screen_345       : { name:'Acoustic screen',     cat:'Rooms',    foot:[3.45, 0.05, DIM.DESK_H+DIM.SCREEN_H], make:()=>acousticScreen(3.45) },
+  screen_120       : { name:'Screen, 1.2 m',       cat:'Rooms',    foot:[1.20, 0.05, DIM.DESK_H+DIM.SCREEN_H], make:()=>acousticScreen(1.20) },
+
+  planter_lg       : { name:'Planter, large',      cat:'Planting', foot:[0.60, 0.60, 1.70],  make:()=>planter(0.300, 0.560, 1.200) },
+  planter_md       : { name:'Planter, medium',     cat:'Planting', foot:[0.58, 0.58, 1.70],  make:()=>planter(0.290, 0.560, 1.180) },
+  planter_sm       : { name:'Planter, small',      cat:'Planting', foot:[0.46, 0.46, 1.20],  make:()=>planter(0.230, 0.440, 0.780) },
+  planter_tall     : { name:'Planter, slim',       cat:'Planting', foot:[0.52, 0.52, 1.60],  make:()=>planter(0.260, 0.520, 1.150) },
+  desk_plant       : { name:'Desk plant',          cat:'Planting', foot:[0.22, 0.22, 0.30],  z:DIM.DESK_H, make:()=>deskPlant() },
+  laptop           : { name:'Laptop',              cat:'Planting', foot:[0.33, 0.24, 0.24],  z:DIM.DESK_H, make:()=>laptopProp() },
+};
+
+/* ---- The designed fit-out, as data --------------------------------------
+   This is the layout the walkthrough opens with and the one "Reset" returns
+   to. Editing never touches it; edits live in localStorage. ---------------- */
+const DEFAULT_LAYOUT = [
+  // reception & waiting
+  { type:'task_chair',    x:2.10, y:2.76, rot:0   },
+  { type:'sofa2',         x:0.45, y:6.15, rot:270 },
+  { type:'armchair',      x:2.15, y:6.50, rot:215 },
+  { type:'coffee_table',  x:1.50, y:5.78, rot:0   },
+  { type:'planter_tall',  x:2.78, y:5.62, rot:0   },
+  // document & compliance store
+  { type:'file_cabinet',  x:0.300, y:0.335, rot:0 },
+  { type:'file_cabinet',  x:0.795, y:0.335, rot:0 },
+  { type:'file_cabinet',  x:1.290, y:0.335, rot:0 },
+  { type:'file_cabinet',  x:1.785, y:0.335, rot:0 },
+  { type:'shelving_wide', x:2.775, y:1.500, rot:90 },
+  { type:'printer',       x:2.420, y:0.360, rot:0 },
+  { type:'shredder',      x:1.620, y:1.980, rot:0 },
+  // pantry
+  { type:'stool',         x:0.72, y:7.66, rot:90 },
+  { type:'stool',         x:0.72, y:8.34, rot:90 },
+  // flex bay
+  { type:'phone_booth',   x:3.75, y:3.05, rot:0   },
+  { type:'stool',         x:4.95, y:0.76, rot:180 },
+  { type:'stool',         x:5.65, y:0.76, rot:180 },
+  { type:'planter_lg',    x:4.88, y:3.28, rot:0   },
+  { type:'planter_sm',    x:6.28, y:0.58, rot:0   },
+  // open workstations: two benches of three across a 350 mm screen
+  { type:'workstation',   x:3.675, y:6.525, rot:0 },
+  { type:'workstation',   x:4.825, y:6.525, rot:0 },
+  { type:'workstation',   x:5.975, y:6.525, rot:0 },
+  { type:'workstation',     x:3.675, y:7.275, rot:180 },
+  { type:'workstation_std', x:4.825, y:7.275, rot:180 },
+  { type:'workstation',     x:5.975, y:7.275, rot:180 },
+  { type:'screen_345',    x:4.825, y:6.900, rot:0 },
+  { type:'pedestal',      x:3.995, y:6.545, rot:0 },
+  { type:'pedestal',      x:5.145, y:6.545, rot:0 },
+  { type:'pedestal',      x:6.295, y:6.545, rot:0 },
+  { type:'pedestal',      x:3.995, y:7.285, rot:0 },
+  { type:'pedestal',      x:5.145, y:7.285, rot:0 },
+  { type:'pedestal',      x:6.295, y:7.285, rot:0 },
+  { type:'task_chair',    x:3.675, y:5.80, rot:0 },
+  { type:'task_chair_dk', x:4.825, y:5.80, rot:0 },
+  { type:'task_chair',    x:5.975, y:5.80, rot:0 },
+  { type:'task_chair',    x:3.675, y:8.00, rot:180 },
+  { type:'task_chair_dk', x:4.825, y:8.00, rot:180 },
+  { type:'task_chair',    x:5.975, y:8.00, rot:180 },
+  { type:'desk_plant',    x:4.115, y:6.760, rot:0 },
+  { type:'desk_plant',    x:6.415, y:6.760, rot:0 },
+  { type:'laptop',        x:3.675, y:6.360, rot:0 },
+  // client meeting room
+  { type:'conf_table',    x:8.55, y:1.95, rot:0 },
+  { type:'conf_chair',    x:7.75, y:0.90, rot:0 },
+  { type:'conf_chair',    x:8.55, y:0.90, rot:0 },
+  { type:'conf_chair',    x:9.35, y:0.90, rot:0 },
+  { type:'conf_chair',    x:7.75, y:3.00, rot:180 },
+  { type:'conf_chair',    x:8.55, y:3.00, rot:180 },
+  { type:'conf_chair',    x:9.35, y:3.00, rot:180 },
+  { type:'credenza',      x:8.90, y:3.605, rot:180 },
+  { type:'desk_plant',    x:9.36, y:3.600, rot:0, z:0.720 },
+  // director's office
+  { type:'exec_desk',     x:8.15, y:7.60, rot:270 },
+  { type:'exec_chair',    x:7.30, y:7.60, rot:270 },
+  { type:'conf_chair_lt', x:9.15, y:7.15, rot:90  },
+  { type:'conf_chair_lt', x:9.15, y:8.05, rot:90  },
+  { type:'shelving',      x:8.90, y:8.870, rot:0  },
+  { type:'side_table',    x:9.80, y:6.620, rot:0  },
+  // window breakout
+  { type:'round_table',   x:9.40, y:5.10, rot:0   },
+  { type:'conf_chair_lt', x:9.40, y:4.42, rot:0   },
+  { type:'conf_chair_lt', x:9.40, y:5.78, rot:180 },
+  { type:'planter_md',    x:8.00, y:5.720, rot:0  },
+];
+
+/* ---- Meeting room AV: bracketed to the solid pier, so it stays fixed ---- */
+(function meetingAV(){
   const px = 6.70 + HPT;
   G_FURN.add(slab(px+0.008, px+0.062, 1.340, 2.560, 1.030, 1.720, MAT.frame,
                   { collide:false }));
@@ -1418,71 +1616,154 @@ const BENCH_N = { top0: 6.90, top1: 7.65, chair: 8.00, ped: 7.285, face: 180 };
                   { collide:false }));
   G_FURN.add(slab(px+0.010, px+0.080, 1.560, 2.340, 0.900, 0.968, MAT.lamDk,
                   { collide:false }));
-  // low credenza under the north glazing
-  place(credenza(1.600, 0.450, 0.720), 8.90, 3.605, 180, [1.60,0.45,0.72],
-        'meeting_credenza');
-  G_FURN.add(slab(8.44, 8.72, 3.50, 3.72, 0.720, 0.742, MAT.lam, { collide:false }));
-  place(deskPlant(), 9.36, 3.60, 0);
-  // table dressing
-  for (const [dx,dy] of [[-0.55,-0.28],[0.55,0.28],[-0.55,0.28],[0.55,-0.28]])
-    G_FURN.add(slab(cx+dx-0.10, cx+dx+0.10, cy+dy-0.07, cy+dy+0.07, th, th+0.010,
-                    MAT.lam, { collide:false }));
-  G_FURN.add(post(cx+0.98, cy+0.30, th, th+0.235, 0.048, 0.040, MAT.glassIn, 14));
-  for (const s of [-1,1])
-    G_FURN.add(post(cx+0.86, cy+s*0.10, th, th+0.095, 0.032, 0.034, MAT.glassIn, 12));
 })();
 
-/* ---- Director's office --------------------------------------------------
-   Desk turned so the director faces the door with the city to their right;
-   guests sit window-side. 0.98 m behind the director, 0.87 m behind guests. */
-(function director(){
-  const x0=7.725, x1=8.575, y0=6.750, y1=8.450, h=0.750;
-  G_FURN.add(slab(x0, x1, y0, y1, h-0.034, h, MAT.walnut, { name:'exec_desk' }));
-  for (const y of [y0+0.085, y1-0.085])
-    G_FURN.add(slab(x0+0.03, x1-0.03, y-0.028, y+0.028, 0, h-0.034, MAT.navy,
-                    { collide:false }));
-  G_FURN.add(slab(x1-0.055, x1-0.030, y0+0.14, y1-0.14, 0.300, h-0.120, MAT.navy,
-                  { collide:false }));                       // modesty panel
-  G_FURN.add(slab(x0-0.010, x1+0.010, y0-0.010, y0-0.002, h-0.034, h, MAT.brass,
-                  { collide:false }));
-  place(taskChair(MAT.leather), 7.30, 7.60, 270, [0.62,0.62,1.10], 'director_chair');
-  place(confChair(MAT.fabric), 9.15, 7.15, 90, [0.56,0.56,0.98], 'guest_chair_1');
-  place(confChair(MAT.fabric), 9.15, 8.05, 90, [0.56,0.56,0.98], 'guest_chair_2');
-  place(shelving(1.000, 0.350, 2.000, 5), 8.90, 8.870, 0, [1.00,0.35,2.00],
-        'director_bookshelf');
-  // side table
-  const st = new THREE.Group();
-  st.add(lbox(0.500,0.500,0.030,MAT.walnut,0,0,0.470));
-  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
-    st.add(post(sx*0.215, sy*0.215, 0, 0.475, 0.016, 0.014, MAT.brass, 8));
-  place(st, 9.80, 6.620, 0, [0.50,0.50,0.50], 'director_side_table');
-  place(deskPlant(), 9.80, 6.620, 0).position.y = 0.500;
-  // desktop kit
-  const lap = new THREE.Group();
-  lap.add(lbox(0.330,0.235,0.016,MAT.steel,0,0,0));
-  const lid = lbox(0.330,0.014,0.225,MAT.steel,0,0.115,0.016); lid.rotation.x = 0.30; lap.add(lid);
-  place(lap, 8.16, 7.42, 0).position.y = h;
-  G_FURN.add(slab(7.86, 8.10, 7.90, 8.16, h, h+0.020, MAT.lam, { collide:false }));
-  // brass task lamp
-  G_FURN.add(post(8.42, 8.24, h, h+0.018, 0.070, 0.070, MAT.brass, 14));
-  G_FURN.add(post(8.42, 8.24, h+0.018, h+0.430, 0.014, 0.014, MAT.brass, 10));
-  G_FURN.add(post(8.42, 8.18, h+0.360, h+0.440, 0.075, 0.045, MAT.brass, 14));
-})();
+/* ==========================================================================
+   5c. LAYOUT ENGINE — turns the layout array into scene objects, keeps the
+       collider registry in step, and validates every piece against the shell.
+   ========================================================================== */
 
-/* ---- Window-side breakout ----------------------------------------------
-   A small round table pushed to the glazing so the view stays shared.------*/
-(function breakout(){
-  const x=9.40, y=5.10, h=DIM.TABLE_H;
-  G_FURN.add(post(x, y, 0, 0.030, 0.310, 0.290, MAT.frame, 24));
-  G_FURN.add(post(x, y, 0.030, h-0.032, 0.058, 0.052, MAT.frame, 16));
-  G_FURN.add(post(x, y, h-0.032, h, 0.425, 0.425, MAT.walnut, 32));
-  addCollider(x-0.425, x+0.425, y-0.425, y+0.425, 0, h, 'breakout_table', 'furn');
-  place(confChair(MAT.fabric), x, 4.42, 0,   [0.56,0.56,0.98], 'breakout_chair_1');
-  place(confChair(MAT.fabric), x, 5.78, 180, [0.56,0.56,0.98], 'breakout_chair_2');
-  for (const s of [-1,1])
-    G_FURN.add(post(x+s*0.15, y+s*0.09, h, h+0.088, 0.040, 0.040, MAT.lam, 14));
-  place(planter(0.290, 0.560, 1.180), 8.00, 5.720, 0, [0.58,0.58,1.70], 'planter_window');
-})();
+const G_ITEMS = new THREE.Group(); G_ITEMS.name = 'layout'; ROOT.add(G_ITEMS);
+const G_BADGE = new THREE.Group(); ROOT.add(G_BADGE);   // selection + clash boxes
+let selectedId = null;             // set by the editor in section 8b
+
+let LAYOUT = [];                      // live layout
+const itemGroups = new Map();         // id -> THREE.Group
+let itemColliders = [];
+let badItems = new Set();
+
+let _uid = 0;
+const newId = () => 'i' + Date.now().toString(36) + (_uid++).toString(36);
+
+/** Coerce anything (a default row, a parsed JSON row) into a valid item, or
+    null if the type is unknown — so a hand-edited file cannot poison the scene. */
+function normaliseItem(raw){
+  const def = raw && CATALOG[raw.type];
+  if (!def) return null;
+  const n = v => (Number.isFinite(+v) ? +v : 0);
+  return {
+    id  : raw.id || newId(),
+    type: raw.type,
+    x   : Math.min(Math.max(n(raw.x), 0), W),
+    y   : Math.min(Math.max(n(raw.y), 0), D),
+    rot : ((n(raw.rot) % 360) + 360) % 360,
+    z   : raw.z !== undefined ? n(raw.z) : (def.z || 0),
+  };
+}
+
+/** Conservative axis-aligned box for a rotated footprint. Used for walk
+    collision and the collider registry, where being generous is the safe way
+    to be wrong. */
+function itemAABB(it){
+  const def = CATALOG[it.type], [w,d,h] = def.foot;
+  const a = it.rot * Math.PI/180, c = Math.abs(Math.cos(a)), s = Math.abs(Math.sin(a));
+  const ww = w*c + d*s, dd = w*s + d*c;
+  return { x0:it.x-ww/2, x1:it.x+ww/2, y0:it.y-dd/2, y1:it.y+dd/2,
+           z0:it.z, z1:it.z+h, name:def.name, kind:'furn', id:it.id };
+}
+
+/* --- oriented-box overlap (SAT) ------------------------------------------
+   The AABB above is too generous for anything sitting on a diagonal — a
+   armchair at 215° gets a box 40% wider than the chair. Clash *reporting*
+   uses the true oriented box so the editor does not cry wolf. -------------- */
+function obbOf(it){
+  const def = CATALOG[it.type], [w,d,h] = def.foot, a = it.rot*Math.PI/180;
+  return { cx:it.x, cy:it.y, hw:w/2, hd:d/2,
+           c:Math.cos(a), s:Math.sin(a), z0:it.z, z1:it.z+h };
+}
+const obbOfAABB = b => ({ cx:(b.x0+b.x1)/2, cy:(b.y0+b.y1)/2,
+                          hw:(b.x1-b.x0)/2, hd:(b.y1-b.y0)/2,
+                          c:1, s:0, z0:b.z0, z1:b.z1 });
+function obbOverlap(A, B, tol = 0.004){
+  if (A.z0 >= B.z1 - tol || A.z1 <= B.z0 + tol) return false;   // no height overlap
+  const dx = B.cx - A.cx, dy = B.cy - A.cy;
+  const axes = [[A.c,A.s], [-A.s,A.c], [B.c,B.s], [-B.s,B.c]];
+  for (const [ax,ay] of axes){
+    const ra = A.hw*Math.abs(ax*A.c + ay*A.s) + A.hd*Math.abs(-ax*A.s + ay*A.c);
+    const rb = B.hw*Math.abs(ax*B.c + ay*B.s) + B.hd*Math.abs(-ax*B.s + ay*B.c);
+    if (Math.abs(dx*ax + dy*ay) > ra + rb - tol) return false;  // separating axis
+  }
+  return true;
+}
+
+/* --- build / sync --------------------------------------------------------
+   Note there is deliberately NO item-vs-item clash test. Pedestals belong
+   under desks and chairs belong under tables; flagging those would be noise,
+   and it matches what section 9c has always checked. ---------------------- */
+function validateLayout(){
+  const shell = COLLIDERS.filter(c => c.kind === 'shell').map(obbOfAABB);
+  const bad = new Set();
+  for (const it of LAYOUT){
+    const box = itemAABB(it);
+    if (box.x0 < -0.002 || box.x1 > W + 0.002 ||
+        box.y0 < -0.002 || box.y1 > D + 0.002){ bad.add(it.id); continue; }
+    const A = obbOf(it);
+    for (const s of shell) if (obbOverlap(A, s)){ bad.add(it.id); break; }
+  }
+  return bad;
+}
+
+function buildItem(it){
+  const u = unit(it.x, it.y, it.rot);
+  u.position.y = it.z;
+  u.add(CATALOG[it.type].make());
+  u.userData.itemId = it.id;
+  u.traverse(o => { o.userData.itemId = it.id; });
+  return u;
+}
+function syncItem(it){
+  const g = itemGroups.get(it.id);
+  if (!g) return;
+  g.position.set(it.x, it.z, it.y);
+  g.rotation.y = -it.rot * Math.PI/180;
+}
+function disposeGroup(g){
+  g.traverse(o => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
+}
+function renderLayout(){
+  for (const g of itemGroups.values()){ G_ITEMS.remove(g); disposeGroup(g); }
+  itemGroups.clear();
+  for (const it of LAYOUT){
+    const g = buildItem(it);
+    itemGroups.set(it.id, g);
+    G_ITEMS.add(g);
+  }
+  afterLayoutChange();
+}
+
+/** Everything that has to happen after any edit: colliders, walk solids,
+    validation, and the red boxes that mark whatever is fouling the shell. */
+const BADGE_BAD = 0xE2564B, BADGE_SEL = C.BRASS;
+function afterLayoutChange(){
+  itemColliders = LAYOUT.map(itemAABB);
+  walkSolids = allColliders().filter(c => c.z1 > 0.32 && c.z0 < CAM.EYE_H + 0.10);
+  badItems = validateLayout();
+  drawBadges();
+  for (const fn of layoutListeners) fn();
+}
+const layoutListeners = [];        // the editor and the readout subscribe here
+const allColliders = () => COLLIDERS.concat(itemColliders);
+
+function boxHelperFor(it, colour){
+  const b = itemAABB(it);
+  const box = new THREE.Box3(new THREE.Vector3(b.x0, b.z0, b.y0),
+                             new THREE.Vector3(b.x1, b.z1, b.y1));
+  const h = new THREE.Box3Helper(box, colour);
+  h.material.depthTest = false;      // read through whatever it is wrapping
+  h.renderOrder = 999;
+  return h;
+}
+function drawBadges(){
+  while (G_BADGE.children.length){
+    const c = G_BADGE.children.pop();
+    if (c.geometry) c.geometry.dispose();
+    if (c.material) c.material.dispose();
+  }
+  for (const it of LAYOUT){
+    if (badItems.has(it.id))         G_BADGE.add(boxHelperFor(it, BADGE_BAD));
+    else if (it.id === selectedId)   G_BADGE.add(boxHelperFor(it, BADGE_SEL));
+  }
+}
 
 /* ==========================================================================
    6. LIGHTING
@@ -1619,8 +1900,8 @@ function aimWalk(x, y, yaw, pitch = 0){
 aimWalk(CAM.START.x, CAM.START.y, CAM.START.yaw);
 
 // Only solids that actually stand in a walker's way: anything whose top is
-// above knee height and whose base is below eye height.
-const WALK_SOLIDS = () => COLLIDERS.filter(c => c.z1 > 0.32 && c.z0 < CAM.EYE_H + 0.10);
+// above knee height and whose base is below eye height. Rebuilt by
+// afterLayoutChange() every time the layout is edited.
 let walkSolids = [];
 
 const keys = { w:false, a:false, s:false, d:false, shift:false };
@@ -1744,6 +2025,10 @@ const elRule  = $('rule'), elRuleTxt = $('ruletxt');
 
 let MODE = 'walk';
 const CAMS = { walk: walkCam, top: topCam, orbit: orbitCam };
+// Set true at the end of section 8b. setMode() runs before the editor exists
+// during start-up, and `typeof` on a not-yet-initialised const throws rather
+// than reporting 'undefined', so guard with a plain flag.
+let editorReady = false;
 
 /* --- 8a. Zone labels, one absolutely-positioned div per zone ------------- */
 const LABELS = ZONES.map(z => {
@@ -1808,6 +2093,12 @@ function setMode(m){
   sun.intensity  = (m === 'top') ? 0.85 : LIGHT.SUN_INT;
   renderer.toneMappingExposure = (m === 'top') ? 1.12 : LIGHT.EXPOSURE;
 
+  // the editor follows the active camera, and shuts off entirely in walk mode
+  if (editorReady){
+    gizmo.camera = CAMS[m];
+    if (m === 'walk' && editing) setEditing(false);
+    else if (editing) G_BADGE.visible = true;
+  }
   if (m === 'top') layoutScaleBar(syncTop());
 }
 
@@ -1839,11 +2130,13 @@ addEventListener('blur', () => { keys.w=keys.a=keys.s=keys.d=keys.shift=false; }
 let dragging = false, lastX = 0, lastY = 0;
 renderer.domElement.addEventListener('pointerdown', e => {
   if (MODE !== 'top') return;
+  // a press that lands on a gizmo handle belongs to the gizmo, not the pan
+  if (editorReady && editing && (gizmo.axis || gizmo.dragging)) return;
   dragging = true; lastX = e.clientX; lastY = e.clientY;
   renderer.domElement.setPointerCapture(e.pointerId);
 });
 renderer.domElement.addEventListener('pointermove', e => {
-  if (!dragging || MODE !== 'top') return;
+  if (!dragging || MODE !== 'top' || topDragBlocked) return;
   const vh = (topCam.top - topCam.bottom) / topState.zoom;
   const mPerPx = vh / innerHeight;
   topState.panX -= (e.clientX - lastX) * mPerPx;   // screen right == plan +X
@@ -1876,8 +2169,353 @@ function onResize(){
 addEventListener('resize', onResize);
 
 /* ==========================================================================
+   8b. LAYOUT EDITOR
+   --------------------------------------------------------------------------
+   Available in top and orbit (you cannot manipulate anything while the
+   pointer is locked in walk mode). Click a piece to select, drag the gizmo to
+   move or spin it, pick from the palette to add. Every change re-runs the
+   same clash check section 9c runs at load, so a piece fouling a wall or the
+   column is outlined in red the moment it lands there.
+   ========================================================================== */
+
+const STORE_KEY   = 'consensusbiz.layout.v1';
+const SNAP_XY     = 0.05;      // 50 mm
+const SNAP_DEG    = 15;
+const elEdit  = $('edit'),   elPal   = $('palette'), elProps = $('props');
+const elClash = $('clashes'),elFile  = $('eFile');
+const bEdit   = $('bEdit'),  bUndo   = $('eUndo'),   bRedo   = $('eRedo');
+const bSnap   = $('eSnap'),  bMove   = $('eMove'),   bTurn   = $('eTurn');
+
+let editing = false, snapping = true;
+let undoStack = [], redoStack = [];
+
+const cloneLayout = l => l.map(o => ({ ...o }));
+const findItem    = id => LAYOUT.find(o => o.id === id);
+
+/* --- 8b-i. history + persistence ---------------------------------------- */
+function pushHistory(){
+  undoStack.push(cloneLayout(LAYOUT));
+  if (undoStack.length > 80) undoStack.shift();
+  redoStack.length = 0;
+  refreshHistoryButtons();
+}
+function refreshHistoryButtons(){
+  bUndo.disabled = undoStack.length === 0;
+  bRedo.disabled = redoStack.length === 0;
+}
+function undo(){
+  if (!undoStack.length) return;
+  redoStack.push(cloneLayout(LAYOUT));
+  LAYOUT = undoStack.pop();
+  select(null); renderLayout(); saveLocal(); refreshHistoryButtons();
+}
+function redo(){
+  if (!redoStack.length) return;
+  undoStack.push(cloneLayout(LAYOUT));
+  LAYOUT = redoStack.pop();
+  select(null); renderLayout(); saveLocal(); refreshHistoryButtons();
+}
+
+let saveTimer = 0;
+function saveLocal(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    // Storage can throw in private windows or with site data blocked; a failed
+    // save must never take the scene down with it.
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify({ v:1, items:LAYOUT }));
+    } catch (e){ console.warn('Layout not saved to this browser:', e.message); }
+  }, 350);
+}
+function loadLocal(){
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const items = (parsed && Array.isArray(parsed.items) ? parsed.items : [])
+                    .map(normaliseItem).filter(Boolean);
+    return items.length ? items : null;
+  } catch (e){ console.warn('Stored layout unreadable, using the design:', e.message); return null; }
+}
+
+/* --- 8b-ii. selection ---------------------------------------------------- */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function pickAt(cx, cy){
+  ndc.set((cx/innerWidth)*2 - 1, -(cy/innerHeight)*2 + 1);
+  ray.setFromCamera(ndc, CAMS[MODE]);
+  const hits = ray.intersectObjects(G_ITEMS.children, true);
+  return hits.length ? hits[0].object.userData.itemId : null;
+}
+function select(id){
+  selectedId = id;
+  const it = id ? findItem(id) : null;
+  if (it){
+    gizmo.attach(itemGroups.get(id));
+    gizmo.visible = true;
+  } else {
+    gizmo.detach();
+    gizmo.visible = false;
+  }
+  drawBadges();
+  renderProps();
+}
+
+function renderProps(){
+  // never rebuild the panel out from under someone typing in it
+  if (elProps.contains(document.activeElement) &&
+      document.activeElement.tagName === 'INPUT') return;
+  const it = selectedId ? findItem(selectedId) : null;
+  if (!it){
+    elProps.innerHTML = '<div class="none">Nothing selected &mdash; click a piece.</div>';
+    return;
+  }
+  const def = CATALOG[it.type];
+  const bad = badItems.has(it.id);
+  elProps.innerHTML =
+    `<div class="name">${def.name}${bad ? ' &nbsp;<span style="color:#E2564B">clashes</span>' : ''}</div>` +
+    `<label>X <input id="pX" type="number" step="0.05" value="${it.x.toFixed(2)}"></label>` +
+    `<label>Y <input id="pY" type="number" step="0.05" value="${it.y.toFixed(2)}"></label>` +
+    `<label>&deg; <input id="pR" type="number" step="15" value="${it.rot.toFixed(0)}"></label>` +
+    `<div class="row" style="margin-top:6px">` +
+      `<button id="pDup">Duplicate</button><button id="pDel" class="warn">Delete</button></div>`;
+  const commit = () => {
+    const nx = parseFloat($('pX').value), ny = parseFloat($('pY').value),
+          nr = parseFloat($('pR').value);
+    pushHistory();
+    if (Number.isFinite(nx)) it.x = Math.min(Math.max(nx, 0), W);
+    if (Number.isFinite(ny)) it.y = Math.min(Math.max(ny, 0), D);
+    if (Number.isFinite(nr)) it.rot = ((nr % 360) + 360) % 360;
+    syncItem(it); afterLayoutChange(); saveLocal(); renderProps();
+  };
+  for (const id of ['pX','pY','pR'])
+    $(id).addEventListener('change', commit);
+  $('pDup').onclick = () => duplicateSelected();
+  $('pDel').onclick = () => deleteSelected();
+}
+
+/* --- 8b-iii. mutations --------------------------------------------------- */
+function addItem(type, at){
+  const def = CATALOG[type]; if (!def) return;
+  const p = at || viewCentre();
+  const it = normaliseItem({ type, x:p.x, y:p.y, rot:0 });
+  pushHistory();
+  LAYOUT.push(it);
+  const g = buildItem(it); itemGroups.set(it.id, g); G_ITEMS.add(g);
+  afterLayoutChange(); saveLocal(); select(it.id);
+}
+function deleteSelected(){
+  const it = selectedId && findItem(selectedId); if (!it) return;
+  pushHistory();
+  const g = itemGroups.get(it.id);
+  if (g){ G_ITEMS.remove(g); disposeGroup(g); itemGroups.delete(it.id); }
+  LAYOUT = LAYOUT.filter(o => o.id !== it.id);
+  select(null); afterLayoutChange(); saveLocal();
+}
+function duplicateSelected(){
+  const it = selectedId && findItem(selectedId); if (!it) return;
+  pushHistory();
+  const copy = normaliseItem({ ...it, id:null, x:it.x + 0.30, y:it.y + 0.30 });
+  LAYOUT.push(copy);
+  const g = buildItem(copy); itemGroups.set(copy.id, g); G_ITEMS.add(g);
+  afterLayoutChange(); saveLocal(); select(copy.id);
+}
+/** Where a newly added piece lands: the middle of what you are looking at,
+    clamped inside the parcel so it never appears out in the city. */
+function viewCentre(){
+  if (MODE === 'top') return { x: clamp(W/2 + topState.panX, 0.6, W-0.6),
+                               y: clamp(D/2 + topState.panY, 0.6, D-0.6) };
+  const t = orbit.target;
+  return { x: clamp(t.x, 0.6, W-0.6), y: clamp(t.z, 0.6, D-0.6) };
+}
+const clamp = (v,a,b) => Math.min(Math.max(v,a),b);
+
+function resetLayout(){
+  pushHistory();
+  LAYOUT = DEFAULT_LAYOUT.map(normaliseItem).filter(Boolean);
+  select(null); renderLayout(); saveLocal();
+}
+
+/* --- 8b-iv. export / import --------------------------------------------- */
+function exportLayout(){
+  const blob = new Blob([JSON.stringify({
+    project:'Consensusbiz — Petak 70, Tingkat 20, Menara A',
+    parcel:{ w:W, d:D, area:+PARCEL_AREA.toFixed(2) },
+    v:1, items:LAYOUT,
+  }, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'consensusbiz-layout.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+elFile.addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const parsed = JSON.parse(r.result);
+      const items = (Array.isArray(parsed) ? parsed
+                    : Array.isArray(parsed.items) ? parsed.items : [])
+                    .map(normaliseItem).filter(Boolean);
+      if (!items.length) throw new Error('no recognisable furniture in that file');
+      pushHistory();
+      LAYOUT = items; select(null); renderLayout(); saveLocal();
+    } catch (err){
+      console.error('Import failed:', err.message);
+      elClash.className = 'bad';
+      elClash.textContent = 'Import failed — ' + err.message;
+    }
+  };
+  r.readAsText(f);
+  e.target.value = '';
+});
+
+/* --- 8b-v. gizmo --------------------------------------------------------- */
+const gizmo = new TransformControls(walkCam, renderer.domElement);
+gizmo.setSpace('world');
+gizmo.setSize(0.72);
+gizmo.visible = false;
+// r160 exposes the gizmo through .getHelper() in newer builds; fall back to
+// adding the controls object itself on builds where it is still an Object3D.
+scene.add(gizmo.getHelper ? gizmo.getHelper() : gizmo);
+
+/** Translate shows the two floor axes and hides the vertical one — furniture
+    stays on the floor. Rotate shows only the vertical ring, which is the one
+    axis furniture actually turns about. They are different handle sets, hence
+    the Move / Turn toggle rather than one combined gizmo. */
+let gizmoMode = 'translate';
+function setGizmoMode(m){
+  gizmoMode = m;
+  gizmo.setMode(m);
+  gizmo.showX = (m === 'translate');
+  gizmo.showZ = (m === 'translate');
+  gizmo.showY = (m === 'rotate');
+  bMove.classList.toggle('on', m === 'translate');
+  bTurn.classList.toggle('on', m === 'rotate');
+}
+
+gizmo.addEventListener('dragging-changed', e => {
+  orbit.enabled = (MODE === 'orbit') && !e.value;
+  topDragBlocked = e.value;
+  if (!e.value){ afterLayoutChange(); saveLocal(); renderProps(); }
+  else pushHistory();
+});
+gizmo.addEventListener('objectChange', () => {
+  const it = selectedId && findItem(selectedId); if (!it) return;
+  const g = itemGroups.get(it.id);
+  let x = g.position.x, y = g.position.z;
+  let rot = ((-g.rotation.y * 180/Math.PI) % 360 + 360) % 360;
+  if (snapping){
+    x = Math.round(x / SNAP_XY) * SNAP_XY;
+    y = Math.round(y / SNAP_XY) * SNAP_XY;
+    rot = Math.round(rot / SNAP_DEG) * SNAP_DEG;
+  }
+  it.x = clamp(x, 0, W); it.y = clamp(y, 0, D); it.rot = rot % 360;
+  syncItem(it);
+  itemColliders = LAYOUT.map(itemAABB);
+  badItems = validateLayout();
+  drawBadges();
+});
+
+/* --- 8b-vi. wiring ------------------------------------------------------- */
+function buildPalette(){
+  const groups = {};
+  for (const [id, def] of Object.entries(CATALOG))
+    (groups[def.cat] = groups[def.cat] || []).push([id, def]);
+  elPal.innerHTML = '';
+  for (const [cat, list] of Object.entries(groups)){
+    const h = document.createElement('div'); h.className = 'grp'; h.textContent = cat;
+    elPal.appendChild(h);
+    for (const [id, def] of list){
+      const b = document.createElement('button');
+      b.className = 'it'; b.textContent = def.name;
+      b.onclick = () => addItem(id);
+      elPal.appendChild(b);
+    }
+  }
+}
+function setEditing(on){
+  editing = on && MODE !== 'walk';
+  elEdit.classList.toggle('on', editing);
+  bEdit.classList.toggle('on', editing);
+  G_BADGE.visible = editing;
+  // the drawer occupies the top-right corner, so the title plate steps aside
+  $('plate').style.display = editing ? 'none' : '';
+  if (!editing) select(null);
+  refreshHistoryButtons();
+}
+bEdit.onclick   = () => { if (MODE === 'walk') setMode('orbit'); setEditing(!editing); };
+bUndo.onclick   = undo;
+bRedo.onclick   = redo;
+bSnap.onclick   = () => { snapping = !snapping; bSnap.classList.toggle('on', snapping); };
+bMove.onclick   = () => setGizmoMode('translate');
+bTurn.onclick   = () => setGizmoMode('rotate');
+$('eExport').onclick = exportLayout;
+$('eImport').onclick = () => elFile.click();
+$('eReset').onclick  = () => resetLayout();
+
+/* Selection fires on pointer-UP, and only if the pointer barely moved. A drag
+   is the camera orbiting or the plan panning, and must not change what is
+   selected; a press that starts on a gizmo handle is the gizmo's business. */
+let topDragBlocked = false;
+let downAt = null;
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (!editing || e.button !== 0) return;
+  downAt = (gizmo.axis || gizmo.dragging) ? null : { x:e.clientX, y:e.clientY };
+});
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!editing || e.button !== 0 || !downAt) return;
+  const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
+  downAt = null;
+  if (moved > 5 || gizmo.dragging) return;
+  select(pickAt(e.clientX, e.clientY));
+});
+
+addEventListener('keydown', e => {
+  const typing = /^(INPUT|TEXTAREA)$/.test((e.target||{}).tagName || '');
+  if (typing) return;
+  if (e.code === 'KeyE' && !e.ctrlKey && !e.metaKey){
+    if (MODE === 'walk') setMode('orbit');
+    setEditing(!editing); return;
+  }
+  if (!editing) return;
+  if (e.code === 'Escape') select(null);
+  if (e.code === 'Delete' || e.code === 'Backspace'){ deleteSelected(); e.preventDefault(); }
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyD'){ duplicateSelected(); e.preventDefault(); }
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ'){
+    e.shiftKey ? redo() : undo(); e.preventDefault();
+  }
+});
+
+// the clash readout, refreshed on every layout change
+layoutListeners.push(() => {
+  const n = badItems.size;
+  elClash.className = n ? 'bad' : 'ok';
+  elClash.textContent = n
+    ? `${n} piece${n>1?'s':''} fouling the shell`
+    : `${LAYOUT.length} pieces · all clear`;
+  if (selectedId) renderProps();
+});
+
+buildPalette();
+setGizmoMode('translate');
+refreshHistoryButtons();
+editorReady = true;
+
+/* ==========================================================================
    9. MAIN — verification, then the render loop.
    ========================================================================== */
+
+/* --- 9a0. Bring the layout up ------------------------------------------
+   A layout saved in this browser wins over the designed fit-out; anything
+   unreadable falls back to the design rather than failing. Everything below
+   verifies whatever actually got loaded, not the defaults. ---------------- */
+const storedLayout = loadLocal();
+LAYOUT = (storedLayout || DEFAULT_LAYOUT.map(normaliseItem).filter(Boolean));
+renderLayout();
+if (storedLayout)
+  console.log(`Loaded a saved layout from this browser: ${LAYOUT.length} pieces. ` +
+              `"Reset" in the editor restores the designed fit-out.`);
 
 /* --- 9a. Area verification ----------------------------------------------
    Computed from the surveyed corners, never typed in. ---------------------*/
@@ -1926,7 +2564,7 @@ function overlaps(a, b, tol = 0.002){
          a.y0 < b.y1 - tol && a.y1 > b.y0 + tol &&
          a.z0 < b.z1 - tol && a.z1 > b.z0 + tol;
 }
-const furn  = COLLIDERS.filter(c => c.kind === 'furn');
+const furn  = itemColliders;                                  // the live layout
 const shell = COLLIDERS.filter(c => c.kind === 'shell');
 const clashes = [];
 for (const f of furn)
@@ -1953,7 +2591,7 @@ console.log(`Containment check: all furniture inside the parcel → ` +
    Walk the entrance spine metre by metre and report the narrowest clear
    width, so the 1.5 m claim is measured rather than asserted. -------------*/
 (function spineAudit(){
-  const blockers = COLLIDERS.filter(c => c.z1 > 0.32 && c.z0 < 1.80);
+  const blockers = allColliders().filter(c => c.z1 > 0.32 && c.z0 < 1.80);
   const R = CIRC.SPINE_ROUTE;
   const samples = [];
   for (let i=0;i<R.length-1;i++){
@@ -1998,7 +2636,6 @@ console.log(`Scene built: ${renderer.info.render.triangles || '—'} tris pendin
             `${COLLIDERS.length} colliders, ${rectLights.length} RectAreaLights.`);
 
 /* --- 9e. Render loop ----------------------------------------------------- */
-walkSolids = WALK_SOLIDS();
 setMode('walk');
 onResize();
 
@@ -2030,6 +2667,19 @@ requestAnimationFrame(tick);
 window.__office = {
   setMode, aimWalk, renderer, scene, CAMS, topState, syncTop, layoutScaleBar,
   parcelArea: PARCEL_AREA, zoneRows, clashes, outside, colliders: COLLIDERS,
+  // editor surface, used by the headless checks in _editorcheck.js
+  setEditing, select, addItem, deleteSelected, duplicateSelected,
+  undo, redo, resetLayout, exportLayout, saveLocal, renderLayout,
+  catalog: CATALOG, storeKey: STORE_KEY,
+  layout: () => LAYOUT,
+  bad:    () => [...badItems],
+  // mirrors a gizmo drag, history push included, so undo behaves the same way
+  moveTo(id, x, y, rot){
+    const it = LAYOUT.find(o => o.id === id); if (!it) return false;
+    pushHistory();
+    it.x = x; it.y = y; if (rot !== undefined) it.rot = rot;
+    syncItem(it); afterLayoutChange(); saveLocal(); return true;
+  },
   chrome(on){ for (const id of ['bar','plate','help','lock','cross','readout'])
                 document.getElementById(id).style.display = on ? '' : 'none'; },
   ready: true,
