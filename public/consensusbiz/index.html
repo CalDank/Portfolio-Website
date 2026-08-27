@@ -161,6 +161,31 @@
   #clashes.ok{color:#5FA372}
   #clashes.bad{color:#E2564B}
 
+  /* ---- tape measure ---- */
+  #tape{position:fixed;inset:0;z-index:22;display:none;pointer-events:none}
+  #tape.on{display:block}
+  .tlbl{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;
+    font:600 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.02em;
+    color:#1B1206;background:var(--brass);border-radius:4px;padding:3px 6px;
+    box-shadow:0 1px 6px rgba(0,0,0,.4)}
+  .tlbl.run{background:rgba(20,24,31,.92);color:var(--brass);
+    border:1px solid rgba(176,141,87,.55)}
+  #tsnap{position:absolute;width:13px;height:13px;margin:-7px 0 0 -7px;
+    border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.5);
+    display:none}
+  #tapePanel{position:fixed;left:14px;bottom:64px;z-index:41;width:212px;display:none;
+    background:rgba(20,24,31,.90);backdrop-filter:blur(12px);
+    border:1px solid var(--line);border-radius:10px;padding:10px}
+  #tapePanel.on{display:block}
+  #tapePanel h3{margin:0 0 6px;font:700 10px/1 "Inter",system-ui,sans-serif;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--brass)}
+  #tapeList{font:500 11px/1.6 ui-monospace,monospace;color:#9B958A;
+    max-height:150px;overflow-y:auto}
+  #tapeList b{color:#E8E4DC;font-weight:600}
+  #tapeTot{margin-top:6px;padding-top:6px;border-top:1px solid var(--line);
+    font:600 12px/1.3 ui-monospace,monospace;color:var(--brass)}
+  #tapeHint{margin-top:6px;font:500 10px/1.45 "Inter",system-ui,sans-serif;color:#6E6A62}
+
   /* ---- selection marquee ---- */
   #marquee{position:fixed;z-index:39;display:none;pointer-events:none;
     border:1px solid var(--brass);background:rgba(176,141,87,.14);border-radius:2px}
@@ -224,6 +249,19 @@
   <button id="b3"><b>3</b>Orbit</button>
   <button id="bEdit"><b>E</b>Edit</button>
   <button id="bGal"><b>G</b>Gallery</button>
+  <button id="bTape"><b>M</b>Measure</button>
+</div>
+
+<div id="tape"><div id="tsnap"></div></div>
+<div id="tapePanel">
+  <h3>Tape measure</h3>
+  <div id="tapeList"></div>
+  <div id="tapeTot">&mdash;</div>
+  <div id="tapeHint">
+    Click to drop a point, again for the next. It snaps to corners, edge
+    centres and wall ends. <b>Backspace</b> undoes a point, <b>Esc</b> clears,
+    <b>M</b> closes.
+  </div>
 </div>
 
 <div id="gal">
@@ -294,7 +332,8 @@
   <span>WASD to move &middot; mouse to look &middot; Shift to run &middot; Esc to release</span></div></div>
 
 <div id="help">
-  <kbd>1</kbd> walk &nbsp; <kbd>2</kbd> top &nbsp; <kbd>3</kbd> orbit &nbsp; <kbd>E</kbd> edit
+  <kbd>1</kbd> walk &nbsp; <kbd>2</kbd> top &nbsp; <kbd>3</kbd> orbit &nbsp;
+  <kbd>E</kbd> edit &nbsp; <kbd>G</kbd> gallery &nbsp; <kbd>M</kbd> measure
   &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move
   &nbsp;&middot;&nbsp; <kbd>Shift</kbd> run &nbsp;&middot;&nbsp; <kbd>Esc</kbd> release cursor
 </div>
@@ -3425,6 +3464,7 @@ $('palSearch').placeholder = `Search ${Object.keys(CATALOG).length} pieces…`;
 function setEditing(on){
   editing = on && MODE !== 'walk';
   if (editing) makeThumbnails();       // first open pays for the palette renders
+  if (editing && measuringOn()) setMeasuring(false);   // one pointer tool at a time
   elEdit.classList.toggle('on', editing);
   bEdit.classList.toggle('on', editing);
   G_BADGE.visible = editing;
@@ -3544,7 +3584,228 @@ refreshHistoryButtons();
 editorReady = true;
 
 /* ==========================================================================
-   8c. SHARED GALLERY
+   8c. TAPE MEASURE
+   --------------------------------------------------------------------------
+   Point-to-point measuring on the FLOOR PLANE. Distances are plan dimensions,
+   which is what a clearance is — it does not measure diagonally through the
+   air, and it ignores height.
+
+   It snaps to the corners and edge centres of whatever is actually there:
+   furniture footprints, the solid runs of each partition (so a doorway reads
+   as its two jambs), the shell, the column, and the parcel corners. Snapping
+   is judged in screen pixels, so it behaves the same zoomed in or out.
+   ========================================================================== */
+
+const SNAP_PX = 14;
+const elTape = $('tape'), elTapePanel = $('tapePanel'), elTapeList = $('tapeList');
+const elTapeTot = $('tapeTot'), elTsnap = $('tsnap'), bTape = $('bTape');
+
+let measuring = false;
+let tapePts = [];          // committed points, plan coords
+let tapePreview = null;    // where the cursor currently is, snapped
+let tapeLabels = [];       // DOM labels, rebuilt on change
+let tapeDownAt = null;
+
+const _tv = new THREE.Vector3();
+const FLOOR_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const _tray = new THREE.Raycaster(), _tnd = new THREE.Vector2(), _thit = new THREE.Vector3();
+
+function worldToScreen(x, y, z = 0){
+  _tv.set(x, z, y).project(CAMS[MODE]);
+  return [(_tv.x*0.5 + 0.5) * innerWidth, (-_tv.y*0.5 + 0.5) * innerHeight];
+}
+function screenToFloor(cx, cy){
+  _tnd.set((cx/innerWidth)*2 - 1, -(cy/innerHeight)*2 + 1);
+  _tray.setFromCamera(_tnd, CAMS[MODE]);
+  return _tray.ray.intersectPlane(FLOOR_PLANE, _thit) ? { x:_thit.x, y:_thit.z } : null;
+}
+
+/** Corners and edge centres of a local rectangle, in world plan coords. */
+function rectSnapPoints(it, lx0, lx1, ly0, ly1, out){
+  const a = it.rot * Math.PI/180, c = Math.cos(a), s = Math.sin(a);
+  const mx = (lx0+lx1)/2, my = (ly0+ly1)/2;
+  const locals = [[lx0,ly0],[lx1,ly0],[lx1,ly1],[lx0,ly1],
+                  [mx,ly0],[mx,ly1],[lx0,my],[lx1,my]];
+  for (const [px,py] of locals)
+    out.push({ x: it.x + px*c - py*s, y: it.y + px*s + py*c });
+}
+function tapeSnapPoints(near){
+  const R = 1.2, out = [];
+  for (const it of LAYOUT){
+    if (Math.abs(it.x - near.x) > R + 3 || Math.abs(it.y - near.y) > R + 3) continue;
+    const def = CATALOG[it.type]; if (!def) continue;
+    if (def.wall){
+      const t = SHELL.PARTITION_T;
+      for (const [a,b] of wallSegments(it.len, it.door))
+        rectSnapPoints(it, a, b, -t/2, t/2, out);
+    } else {
+      const [w,d] = def.foot;
+      rectSnapPoints(it, -w/2, w/2, -d/2, d/2, out);
+    }
+  }
+  for (const c of COLLIDERS){
+    if (c.kind === 'fixture') continue;
+    for (const x of [c.x0, c.x1, (c.x0+c.x1)/2])
+      for (const y of [c.y0, c.y1, (c.y0+c.y1)/2]) out.push({ x, y });
+  }
+  for (const x of [0, W]) for (const y of [0, D]) out.push({ x, y });
+  return out.filter(p => Math.abs(p.x - near.x) <= R && Math.abs(p.y - near.y) <= R);
+}
+/** Nearest snap point within SNAP_PX on screen, or the raw point. */
+function snapTape(raw, cx, cy){
+  let best = null, bestD = SNAP_PX;
+  for (const p of tapeSnapPoints(raw)){
+    const [sx, sy] = worldToScreen(p.x, p.y);
+    const d = Math.hypot(sx - cx, sy - cy);
+    if (d < bestD){ bestD = d; best = p; }
+  }
+  return best ? { ...best, snapped:true } : { ...raw, snapped:false };
+}
+
+/* --- the drawn tape ------------------------------------------------------
+   Segments are thin strips rather than THREE.Line, because WebGL clamps line
+   width to one pixel on most platforms and a one-pixel tape is invisible over
+   a busy plan. 24 mm reads at every zoom this scene uses. -------------------*/
+const tapeDots = new THREE.Group();
+scene.add(tapeDots);
+const DOT_GEO  = new THREE.SphereGeometry(0.040, 10, 8);
+const TAPE_MAT = new THREE.MeshBasicMaterial({ color: C.BRASS, depthTest: false });
+const SEG_GEO  = new THREE.BoxGeometry(1, 0.004, 0.024);   // scaled per segment
+
+const dist = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
+const fmt  = m => (m >= 1 ? m.toFixed(2) + ' m' : Math.round(m*1000) + ' mm');
+
+function tapeChain(){
+  return tapePreview ? [...tapePts, tapePreview] : [...tapePts];
+}
+function drawTape(){
+  const pts = tapeChain();
+  while (tapeDots.children.length) tapeDots.remove(tapeDots.children[0]);
+  if (measuring){
+    for (let i = 1; i < pts.length; i++){
+      const a = pts[i-1], b = pts[i];
+      const len = dist(a, b);
+      if (len < 1e-4) continue;
+      const seg = new THREE.Mesh(SEG_GEO, TAPE_MAT);
+      seg.scale.x = len;
+      seg.position.set((a.x + b.x)/2, 0.022, (a.y + b.y)/2);
+      seg.rotation.y = -Math.atan2(b.y - a.y, b.x - a.x);
+      seg.renderOrder = 998;
+      tapeDots.add(seg);
+    }
+    for (const p of pts){
+      const m = new THREE.Mesh(DOT_GEO, TAPE_MAT);
+      m.position.set(p.x, 0.024, p.y);
+      m.renderOrder = 999;
+      tapeDots.add(m);
+    }
+  }
+  // labels. Each remembers the world point it belongs to, so the render loop
+  // can re-place them as the camera moves without rebuilding the DOM.
+  for (const l of tapeLabels) l.el.remove();
+  tapeLabels = [];
+  if (!measuring) return;
+  let run = 0;
+  for (let i = 1; i < pts.length; i++){
+    const d = dist(pts[i-1], pts[i]); run += d;
+    const el = document.createElement('div');
+    el.className = 'tlbl';
+    el.textContent = fmt(d);
+    elTape.appendChild(el);
+    tapeLabels.push({ el, x:(pts[i-1].x + pts[i].x)/2, y:(pts[i-1].y + pts[i].y)/2, dy:0 });
+  }
+  if (pts.length > 2){
+    const last = pts[pts.length-1];
+    const el = document.createElement('div');
+    el.className = 'tlbl run';
+    el.textContent = 'total ' + fmt(run);
+    elTape.appendChild(el);
+    tapeLabels.push({ el, x:last.x, y:last.y, dy:-22 });
+  }
+  positionTapeLabels();
+}
+function positionTapeLabels(){
+  for (const l of tapeLabels){
+    const [sx, sy] = worldToScreen(l.x, l.y);
+    l.el.style.left = sx + 'px';
+    l.el.style.top  = (sy + l.dy) + 'px';
+  }
+}
+function renderTapePanel(){
+  const pts = tapeChain();
+  if (pts.length < 2){
+    elTapeList.innerHTML = '<span style="color:#6E6A62">No points yet.</span>';
+    elTapeTot.textContent = '—';
+    return;
+  }
+  let run = 0, rows = '';
+  for (let i = 1; i < pts.length; i++){
+    const d = dist(pts[i-1], pts[i]); run += d;
+    rows += `${i}. <b>${fmt(d)}</b><br>`;
+  }
+  const a = pts[0], b = pts[pts.length-1];
+  elTapeList.innerHTML = rows +
+    (pts.length === 2
+      ? `<span style="color:#6E6A62">Δx ${fmt(Math.abs(b.x-a.x))} · ` +
+        `Δy ${fmt(Math.abs(b.y-a.y))}</span>`
+      : '');
+  elTapeTot.textContent = 'total ' + fmt(run);
+}
+function refreshTape(){ drawTape(); renderTapePanel(); }
+
+function setMeasuring(on){
+  measuring = on;
+  if (on && MODE === 'walk') setMode('top');
+  elTape.classList.toggle('on', measuring);
+  elTapePanel.classList.toggle('on', measuring);
+  bTape.classList.toggle('on', measuring);
+  if (!measuring){ tapePts = []; tapePreview = null; elTsnap.style.display = 'none'; }
+  if (measuring && editing) setEditing(false);   // one pointer tool at a time
+  refreshTape();
+}
+function clearTape(){ tapePts = []; tapePreview = null; refreshTape(); }
+/** Hoisted so section 8b can ask without depending on load order. */
+function measuringOn(){ return measuring; }
+
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (!measuring || e.button !== 0) return;
+  tapeDownAt = { x:e.clientX, y:e.clientY };
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!measuring) return;
+  const raw = screenToFloor(e.clientX, e.clientY);
+  if (!raw){ tapePreview = null; elTsnap.style.display = 'none'; return; }
+  const p = snapTape(raw, e.clientX, e.clientY);
+  tapePreview = tapePts.length ? p : null;
+  if (p.snapped){
+    const [sx, sy] = worldToScreen(p.x, p.y);
+    elTsnap.style.display = 'block';
+    elTsnap.style.left = sx + 'px'; elTsnap.style.top = sy + 'px';
+  } else elTsnap.style.display = 'none';
+  refreshTape();
+});
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!measuring || e.button !== 0 || !tapeDownAt) return;
+  const moved = Math.hypot(e.clientX - tapeDownAt.x, e.clientY - tapeDownAt.y);
+  tapeDownAt = null;
+  if (moved > 5) return;                     // that was a camera drag
+  const raw = screenToFloor(e.clientX, e.clientY);
+  if (!raw) return;
+  tapePts.push(snapTape(raw, e.clientX, e.clientY));
+  refreshTape();
+});
+
+bTape.onclick = () => setMeasuring(!measuring);
+addEventListener('keydown', e => {
+  if (isTyping(e)) return;
+  if (e.code === 'KeyM' && !e.ctrlKey && !e.metaKey){ setMeasuring(!measuring); return; }
+  if (!measuring) return;
+  if (e.code === 'Escape'){ clearTape(); e.preventDefault(); }
+  if (e.code === 'Backspace'){ tapePts.pop(); refreshTape(); e.preventDefault(); }
+});
+
+/* ==========================================================================
+   8d. SHARED GALLERY
    --------------------------------------------------------------------------
    Publish a layout, browse what other people have published, and like the
    ones worth keeping. Backed by an API Gateway HTTP API in front of a Lambda
@@ -3891,6 +4152,7 @@ function tick(now){
   renderer.render(scene, CAMS[MODE]);
 
   if (MODE === 'top') layoutLabels();
+  if (measuring) positionTapeLabels();      // keep the tape readable while orbiting
 
   frames++; fpsT += dt;
   if (fpsT >= 0.5){ fps = frames / fpsT; frames = 0; fpsT = 0;
@@ -3912,6 +4174,10 @@ window.__office = {
   undo, redo, resetLayout, exportLayout, saveLocal, renderLayout,
   catalog: CATALOG, storeKey: STORE_KEY,
   layout: () => LAYOUT,
+  tape: { on:setMeasuring, clear:clearTape,
+          add(x,y){ tapePts.push({x,y}); refreshTape(); },
+          pts:()=>tapePts, snap:(x,y)=>snapTape({x,y}, ...worldToScreen(x,y)),
+          total(){ let r=0; for(let i=1;i<tapePts.length;i++) r+=Math.hypot(tapePts[i].x-tapePts[i-1].x, tapePts[i].y-tapePts[i-1].y); return r; } },
   bad:    () => [...badItems],
   // mirrors a gizmo drag, history push included, so undo behaves the same way
   moveTo(id, x, y, rot){
