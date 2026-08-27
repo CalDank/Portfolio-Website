@@ -127,20 +127,32 @@
   #edit button.warn:hover{background:#7A2E28;border-color:#7A2E28;color:#fff}
   #edit button.on{background:var(--brass);color:#1B1206;border-color:var(--brass)}
   #edit button:disabled{opacity:.35;cursor:default;background:transparent}
+  #palSearch{background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:4px;
+    color:#E8E4DC;padding:5px 7px;font:500 11px/1.2 "Inter",system-ui,sans-serif;width:100%}
   #palette{overflow-y:auto;flex:1 1 auto;margin:0 -4px;padding:0 4px;min-height:80px}
   #palette .grp{font:600 9px/1 "Inter",system-ui,sans-serif;letter-spacing:.14em;
     text-transform:uppercase;color:#6E6A62;margin:9px 0 4px}
-  #palette .it{display:block;width:100%;text-align:left;border:0;border-radius:5px;
-    padding:5px 7px;margin-bottom:2px;cursor:pointer;background:transparent;
-    color:#CFCABF;font:500 11px/1.3 "Inter",system-ui,sans-serif;text-transform:none;
-    letter-spacing:0}
-  #palette .it:hover{background:rgba(176,141,87,.22);color:#fff}
+  #palette .tiles{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:4px}
+  #palette .it{display:flex;flex-direction:column;align-items:center;gap:3px;
+    border:1px solid var(--line);border-radius:6px;padding:4px 3px 5px;cursor:pointer;
+    background:rgba(255,255,255,.035);color:#CFCABF;
+    font:500 9px/1.2 "Inter",system-ui,sans-serif;text-transform:none;letter-spacing:0;
+    transition:.12s}
+  #palette .it:hover{background:rgba(176,141,87,.24);border-color:var(--brass);color:#fff}
+  #palette .it img{width:100%;height:56px;object-fit:contain;display:block;
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))}
+  #palette .it .ph{width:100%;height:56px;display:block;border-radius:4px;
+    background:repeating-linear-gradient(45deg,rgba(255,255,255,.05) 0 6px,
+      rgba(255,255,255,.02) 6px 12px)}
+  #palette .it .cap{text-align:center;line-height:1.15;overflow-wrap:anywhere}
   #props{border-top:1px solid var(--line);padding-top:8px;font-size:11px;color:#9B958A}
   #props .name{color:#E8E4DC;font-weight:600;font-size:12px;margin-bottom:6px}
   #props label{display:flex;align-items:center;gap:5px;margin-bottom:4px;
     font:500 10px/1 ui-monospace,monospace;color:#7E796F}
-  #props input{flex:1;min-width:0;background:rgba(0,0,0,.35);border:1px solid var(--line);
-    border-radius:4px;color:#E8E4DC;padding:4px 6px;font:500 11px/1 ui-monospace,monospace}
+  #props input,#props select{flex:1;min-width:0;background:rgba(0,0,0,.35);
+    border:1px solid var(--line);border-radius:4px;color:#E8E4DC;padding:4px 6px;
+    font:500 11px/1.2 ui-monospace,monospace}
+  #props select{font-family:"Inter",system-ui,sans-serif}
   #props .none{color:#6E6A62;font-style:italic}
   #ehint{font:500 10px/1.5 "Inter",system-ui,sans-serif;color:#6E6A62}
   #ehint b{color:#9B958A;font-weight:600}
@@ -148,6 +160,10 @@
     text-transform:uppercase}
   #clashes.ok{color:#5FA372}
   #clashes.bad{color:#E2564B}
+
+  /* ---- selection marquee ---- */
+  #marquee{position:fixed;z-index:39;display:none;pointer-events:none;
+    border:1px solid var(--brass);background:rgba(176,141,87,.14);border-radius:2px}
 
   /* ---- shared gallery drawer ---- */
   #gal{position:fixed;top:70px;left:14px;bottom:64px;width:300px;z-index:41;
@@ -234,6 +250,7 @@
   <div id="clashes" class="ok">&nbsp;</div>
   <div id="props"><div class="none">Nothing selected &mdash; click a piece.</div></div>
   <h3>Add a piece</h3>
+  <input id="palSearch" placeholder="Search 76 pieces…" autocomplete="off">
   <div id="palette"></div>
   <div id="pub">
     <input id="pubTitle" maxlength="60" placeholder="Give this layout a title">
@@ -247,7 +264,8 @@
     <button id="eReset" class="warn">Reset</button>
   </div>
   <div id="ehint">
-    <b>Drag</b> the arrows to move, the ring to spin.<br>
+    <b>Shift-click</b> adds to the selection, <b>Shift-drag</b> sweeps a box.<br>
+    <b>Ctrl+A</b> all &middot; <b>Ctrl+C/X/V</b> copy, cut, paste<br>
     <b>Del</b> remove &middot; <b>Ctrl+D</b> duplicate &middot; <b>Esc</b> deselect<br>
     Saves to this browser automatically.
   </div>
@@ -270,6 +288,7 @@
   <div id="scalebar"><div class="rule" id="rule"></div><span id="ruletxt">5 m</span></div>
 </div>
 
+<div id="marquee"></div>
 <div id="cross"></div>
 <div id="lock"><div><strong>Click to walk</strong>
   <span>WASD to move &middot; mouse to look &middot; Shift to run &middot; Esc to release</span></div></div>
@@ -978,7 +997,10 @@ G_CEILING.add(plane(-0.02, W+0.02, -0.02, D+0.02, CH, MAT.ceiling, true));
 // reads as a dirty brown band rather than the warm white plasterboard it is.
 G_CEILING.add(slab(0, SHELL.BULKHEAD_W, 0, D, CH-SHELL.BULKHEAD_DROP, CH, MAT.ceiling,
                    { collide:false, cast:false }));
-addCollider(0, SHELL.BULKHEAD_W, 0, D, CH-SHELL.BULKHEAD_DROP, CH, 'fcu_bulkhead', 'shell');
+// 'fixture', not 'shell': it sits at 2.40–2.80 in the ceiling void, so it is
+// never in a walker's way and a partition running under it is a junction, not
+// a clash. Marking it shell made every partition on the corridor side foul it.
+addCollider(0, SHELL.BULKHEAD_W, 0, D, CH-SHELL.BULKHEAD_DROP, CH, 'fcu_bulkhead', 'fixture');
 G_CEILING.add(slab(SHELL.BULKHEAD_W, SHELL.BULKHEAD_W+0.012, 0, D,
                    CH-SHELL.BULKHEAD_DROP, CH-SHELL.BULKHEAD_DROP+0.012, MAT.brass,
                    { collide:false }));
@@ -1023,67 +1045,18 @@ scene.fog = new THREE.Fog(0x9FB6C9, 70, 300);   // far enough to leave the inter
 
 const PT = SHELL.PARTITION_T, HPT = PT/2;
 
-/* --- 4a. Document & compliance store (windowless, corridor wall) --------- */
-// north wall, with the store door at the west end
-solidWall({ along:'x', at:2.30-HPT, t:PT, from:0, to:3.00+HPT,
-            name:'store_north', skirt:true,
-            holes:[{ a:0.15, b:1.05 }] });
-// east wall
-solidWall({ along:'y', at:3.00-HPT, t:PT, from:0, to:2.30-HPT,
-            name:'store_east', skirt:true });
+/* Internal partitions used to be built here. They are demountable, not
+   structure, so they now live in DEFAULT_LAYOUT as `wall:true` catalogue items
+   and can be moved like anything else — see sections 5b and 8b. What remains
+   fixed is only the base build: the corridor wall, the two demising walls, the
+   curtain wall and the surveyed column, all in section 3. */
 
-/* --- 4b. Reception feature wall ------------------------------------------
-   Acoustic timber slats on the store's north face, with the backlit
-   wordmark floated in front of them. --------------------------------------*/
-(function featureWall(){
-  const yF = 2.30 + HPT;                       // reception-side face
-  const x0 = 1.15, x1 = 3.00;
-  // dark backing so the slat shadows read
-  G_PART.add(slab(x0, x1, yF, yF+0.014, 0, CH, MAT.navy, { collide:false }));
-  // 90 mm pitch with a 62 mm slat leaves a 28 mm dark reveal — the proportion
-  // of a real acoustic slat panel. Wider gaps read as stripes, not joinery.
-  const pitch = 0.09, wSlat = 0.062, proud = 0.030;
-  for (let x = x0+0.02; x <= x1-wSlat-0.02; x += pitch){
-    G_PART.add(slab(x, x+wSlat, yF+0.014, yF+0.014+proud, 0, CH, MAT.slat,
-                    { collide:false }));
-  }
-  addCollider(x0, x1, yF, yF+0.05, 0, CH, 'reception_feature_wall', 'shell');
-  // backlit CONSENSUSBIZ sign, 1.70 x 0.30, floated 25 mm off the slats
-  const sx0 = 1.28, sx1 = 2.98, sz0 = 1.62, sz1 = 1.92;
-  G_PART.add(slab(sx0, sx1, yF+0.060, yF+0.075, sz0, sz1, MAT.sign,
-                  { collide:false, cast:false }));
-  // halo spill on the slats behind the sign
-  const halo = new THREE.PointLight(0xFFE9CC, 1.5, 3.2, 2);
-  halo.position.set((sx0+sx1)/2, (sz0+sz1)/2, yF+0.22);
-  G_FIX.add(halo);
-  // brass reveal under the sign
-  G_PART.add(slab(sx0, sx1, yF+0.060, yF+0.078, sz0-0.020, sz0-0.006, MAT.brass,
-                  { collide:false }));
-})();
-
-/* --- 4c. Pantry nook (against demising wall 69, near the entrance) -------
-   Deliberately a nook, not a room: a short return wall gives the counter a
-   back, the rest is open to reception. ------------------------------------*/
-solidWall({ along:'x', at:7.00-HPT, t:PT, from:0, to:1.30, name:'pantry_return', skirt:true });
-solidWall({ along:'y', at:3.00-HPT, t:PT, from:7.00-HPT, to:D, name:'pantry_east', skirt:true });
-
-/* --- 4d. Client meeting room (window + demising corner) ------------------
-   West line: glazed / solid AV pier / glazed / door aperture.
-   North line: fully glazed, so the room borrows the spine's daylight. ------*/
-glazedWall({ along:'y', at:6.70-HPT, from:0.00, to:1.30, name:'meet_w1' });
-solidWall ({ along:'y', at:6.70-HPT, t:PT, from:1.30, to:2.60,
-             name:'meet_av_pier', skirt:true });
-glazedWall({ along:'y', at:6.70-HPT, from:2.60, to:3.90, name:'meet_w2',
-             holes:[{ a:3.00, b:3.90 }] });
-glazedWall({ along:'x', at:3.90-HPT, from:6.70-HPT, to:W, name:'meet_north' });
-// navy acoustic panel on the AV pier, meeting-room side
-G_PART.add(slab(6.70+HPT, 6.70+HPT+0.014, 1.34, 2.56, 0, CH, MAT.navy, { collide:false }));
-
-/* --- 4e. Director's office (the other window corner) ---------------------
-   Glazed with the frosted manifestation band for privacy at seated height. -*/
-glazedWall({ along:'x', at:6.25-HPT, from:6.70-HPT, to:W, name:'dir_south',
-             holes:[{ a:6.85, b:7.75 }] });
-glazedWall({ along:'y', at:6.70-HPT, from:6.25-HPT, to:D, name:'dir_west' });
+/* --- 4b. The reception sign's halo -------------------------------------
+   The slat wall itself is a movable partition now; only the light it throws
+   stays here, because lighting is not part of the layout. ----------------- */
+const signHalo = new THREE.PointLight(0xFFE9CC, 1.5, 3.2, 2);
+signHalo.position.set(2.13, 1.77, 2.57);
+G_FIX.add(signHalo);
 
 /* ==========================================================================
    5. FURNITURE
@@ -1439,6 +1412,538 @@ function phoneBooth(){
   return g;
 }
 
+/* ---- catalogue, part two ------------------------------------------------
+   The second wave of furniture. Same convention throughout: authored in local
+   space, origin at the footprint centre, whoever uses it stands at local -Y.
+
+   One honest limitation: footprints are rectangles, so an L-desk or a corner
+   banquette claims its bounding box. That is conservative for collision and
+   slightly over-eager for clash reporting — leave a few centimetres when you
+   tuck one into a corner. ---------------------------------------------------*/
+const MAT2 = {
+  white  : std({ color:0xF7F6F3, roughness:0.34 }),
+  cork    : std({ color:0xC2A06B, roughness:0.95 }),
+  rugNavy : std({ color:0x2B3550, roughness:0.98 }),
+  rugSand : std({ color:0xC9BCA6, roughness:0.98 }),
+  felt    : std({ color:0x5A6472, roughness:0.96 }),
+  chrome  : std({ color:0xC6CACE, roughness:0.18, metalness:0.85 }),
+  paper   : std({ color:0xFBFAF6, roughness:0.88 }),
+};
+
+/** Four tapered legs at the corners of a w x d top. */
+function legs4(g, w, d, h, mat = MAT.frame, inset = 0.07, r = 0.021){
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    g.add(post(sx*(w/2-inset), sy*(d/2-inset), 0, h, r, r*0.86, mat, 8));
+  return g;
+}
+/** A simple slab top on legs. */
+function tableTop(w, d, h, top = MAT.walnut, leg = MAT.frame){
+  const g = new THREE.Group();
+  lslab(g, -w/2, w/2, -d/2, d/2, h-0.030, h, top);
+  legs4(g, w, d, h-0.030, leg);
+  return g;
+}
+/** A carcass with a plinth and a row of doors, the workhorse for cupboards. */
+function carcass(w, d, h, doors = 2, body = MAT.lam, front = MAT.lam){
+  const g = new THREE.Group();
+  lslab(g, -w/2, w/2, -d/2, d/2, 0.055, h, body);
+  lslab(g, -w/2+0.03, w/2-0.03, -d/2+0.03, d/2-0.03, 0, 0.055, MAT.lamDk);
+  const bw = (w - 0.04) / doors;
+  for (let i=0;i<doors;i++){
+    const x0 = -w/2 + 0.02 + i*bw;
+    lslab(g, x0, x0+bw-0.008, -d/2-0.012, -d/2-0.004, 0.065, h-0.012, front);
+    lslab(g, x0+bw*0.5-0.04, x0+bw*0.5+0.04, -d/2-0.024, -d/2-0.012,
+          h/2-0.01, h/2+0.01, MAT.brass);
+  }
+  return g;
+}
+
+/* --- desks and tables ---------------------------------------------------- */
+function deskL(){
+  const g = new THREE.Group(), h = DIM.DESK_H;
+  lslab(g, -0.80, 0.80, -0.375, 0.375, h-0.025, h, MAT.oak);          // main run
+  lslab(g,  0.42, 0.80,  0.375, 1.175, h-0.025, h, MAT.oak);          // return
+  for (const [x,y] of [[-0.72,-0.30],[-0.72,0.30],[0.72,-0.30],[0.72,1.10],[0.50,1.10]])
+    g.add(post(x, y, 0, h-0.025, 0.030, 0.026, MAT.frame, 8));
+  lslab(g, -0.78, 0.78, 0.30, 0.35, h-0.20, h-0.14, MAT.frame);       // modesty
+  const m = monitor(0.560, 0.335); m.position.set(-0.10, h, 0.22); g.add(m);
+  g.add(lbox(0.420,0.140,0.018,MAT.lamDk,-0.10,-0.10,h));
+  return g;
+}
+function deskSingle(){
+  const g = new THREE.Group(), h = DIM.DESK_H, w = 1.40, d = 0.70;
+  lslab(g, -w/2, w/2, -d/2, d/2, h-0.025, h, MAT.oak);
+  legs4(g, w, d, h-0.025, MAT.frame, 0.06, 0.028);
+  lslab(g, -w/2+0.10, w/2-0.10, d/2-0.06, d/2-0.02, h-0.22, h-0.15, MAT.frame);
+  const m = monitor(0.520, 0.310); m.position.set(0, h, d/2-0.16); g.add(m);
+  g.add(lbox(0.420,0.140,0.018,MAT.lamDk,0,-0.02,h));
+  return g;
+}
+function confTable8(){
+  const g = new THREE.Group(), w = 3.20, d = 1.20, h = DIM.TABLE_H;
+  lslab(g, -w/2, w/2, -d/2, d/2, h-0.036, h, MAT.walnut);
+  lslab(g, -w/2+0.02, w/2-0.02, -d/2+0.02, d/2-0.02, h-0.050, h-0.036, MAT.frame);
+  for (const s of [-1,1])
+    lslab(g, s*1.22-0.032, s*1.22+0.032, -0.48, 0.48, 0, h-0.050, MAT.navy);
+  lslab(g, -1.22, 1.22, -0.05, 0.05, 0.30, 0.37, MAT.frame);
+  for (const s of [-1,0,1])
+    lslab(g, s*0.85-0.16, s*0.85+0.16, -0.055, 0.055, h, h+0.012, MAT.brass);
+  return g;
+}
+function meetTable4(){
+  const g = tableTop(1.20, 1.20, DIM.TABLE_H, MAT.walnut, MAT.frame);
+  lslab(g, -0.14, 0.14, -0.05, 0.05, DIM.TABLE_H, DIM.TABLE_H+0.012, MAT.brass);
+  return g;
+}
+function poseurTable(){
+  const g = new THREE.Group(), h = 1.05, r = 0.42;
+  g.add(post(0, 0, 0, 0.032, 0.34, 0.32, MAT.frame, 24));
+  g.add(post(0, 0, 0.032, h-0.034, 0.055, 0.050, MAT.frame, 16));
+  g.add(post(0, 0, 0.190, 0.212, 0.26, 0.26, MAT.brass, 20));       // foot ring
+  g.add(post(0, 0, h-0.034, h, r, r, MAT.walnut, 32));
+  return g;
+}
+function trainingTable(){
+  const g = new THREE.Group(), w = 1.40, d = 0.60, h = DIM.DESK_H;
+  lslab(g, -w/2, w/2, -d/2, d/2, h-0.024, h, MAT.lam);
+  for (const s of [-1,1]){
+    lslab(g, s*(w/2-0.10)-0.020, s*(w/2-0.10)+0.020, -d/2+0.04, d/2-0.04, 0.03, h-0.024, MAT.frame);
+    lslab(g, s*(w/2-0.10)-0.05, s*(w/2-0.10)+0.05, -d/2+0.02, d/2-0.02, 0, 0.03, MAT.frame);
+  }
+  lslab(g, -w/2+0.08, w/2-0.08, d/2-0.05, d/2-0.02, h-0.30, h-0.06, MAT.felt);
+  return g;
+}
+function benchTable(){
+  const g = new THREE.Group(), w = 2.40, d = 0.90, h = DIM.TABLE_H;
+  lslab(g, -w/2, w/2, -d/2, d/2, h-0.040, h, MAT.oak);
+  for (const s of [-1,1]){
+    lslab(g, s*1.02-0.05, s*1.02+0.05, -d/2+0.06, d/2-0.06, 0, h-0.040, MAT.frame);
+    lslab(g, s*1.02-0.22, s*1.02+0.22, -d/2+0.04, d/2-0.04, 0, 0.035, MAT.frame);
+  }
+  return g;
+}
+
+/* --- seating ------------------------------------------------------------- */
+function visitorChair(fab = MAT.fabric){
+  const g = new THREE.Group();
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    g.add(post(sx*0.195, sy*0.185, 0, 0.445, 0.019, 0.016, MAT.chrome, 8));
+  g.add(lbox(0.450, 0.430, 0.060, fab, 0, 0, 0.440));
+  const bk = lbox(0.430, 0.050, 0.420, fab, 0, -0.190, 0.500); bk.rotation.x = -0.12; g.add(bk);
+  return g;
+}
+function barStool(){
+  const g = new THREE.Group(), h = 0.760;
+  g.add(post(0, 0, 0, 0.024, 0.200, 0.190, MAT.frame, 18));
+  g.add(post(0, 0, 0.024, h-0.040, 0.035, 0.030, MAT.frame, 12));
+  g.add(post(0, 0, 0.200, 0.222, 0.150, 0.150, MAT.brass, 14));
+  g.add(lbox(0.360, 0.340, 0.055, MAT.fabricDk, 0, 0, h-0.040));
+  const bk = lbox(0.330, 0.045, 0.290, MAT.fabricDk, 0, -0.150, h+0.015);
+  bk.rotation.x = -0.16; g.add(bk);
+  return g;
+}
+function loungeChair(fab = MAT.fabric){
+  const g = new THREE.Group();
+  g.add(lbox(0.900, 0.860, 0.090, MAT.walnut, 0, 0, 0.130));
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    g.add(post(sx*0.370, sy*0.350, 0, 0.140, 0.028, 0.024, MAT.brass, 8));
+  g.add(lbox(0.800, 0.760, 0.170, fab, 0, 0.030, 0.215));
+  const bk = lbox(0.880, 0.150, 0.560, fab, 0, -0.350, 0.215); bk.rotation.x = -0.16; g.add(bk);
+  for (const s of [-1,1]) g.add(lbox(0.120, 0.780, 0.280, fab, s*0.390, 0.020, 0.215));
+  return g;
+}
+function sofa3(fab = MAT.fabric){
+  const g = new THREE.Group();
+  g.add(lbox(2.200, 0.850, 0.100, MAT.frame, 0, 0, 0.110));
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    g.add(post(sx*1.030, sy*0.345, 0, 0.120, 0.026, 0.022, MAT.brass, 8));
+  for (const s of [-1,0,1]) g.add(lbox(0.650, 0.750, 0.150, fab, s*0.680, 0.035, 0.210));
+  const bk = lbox(2.180, 0.160, 0.480, fab, 0, -0.345, 0.210); bk.rotation.x = -0.11; g.add(bk);
+  for (const s of [-1,1]) g.add(lbox(0.130, 0.790, 0.260, fab, s*1.035, 0.020, 0.210));
+  for (const s of [-1,1]) g.add(lbox(0.380, 0.130, 0.330, fab, s*0.640, -0.265, 0.355));
+  return g;
+}
+function benchUph(fab = MAT.fabricDk){
+  const g = new THREE.Group();
+  g.add(lbox(1.600, 0.420, 0.110, fab, 0, 0, 0.330));
+  g.add(lbox(1.560, 0.380, 0.030, MAT.walnut, 0, 0, 0.300));
+  for (const s of [-1,1]) g.add(lbox(0.060, 0.360, 0.300, MAT.walnut, s*0.700, 0, 0));
+  return g;
+}
+function ottoman(fab = MAT.fabric){
+  const g = new THREE.Group();
+  g.add(lbox(0.520, 0.520, 0.330, fab, 0, 0, 0.075));
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    g.add(post(sx*0.190, sy*0.190, 0, 0.080, 0.020, 0.017, MAT.brass, 8));
+  return g;
+}
+function stoolLow(){
+  const g = new THREE.Group();
+  g.add(post(0, 0, 0.400, 0.440, 0.190, 0.190, MAT.oak, 20));
+  for (let i=0;i<3;i++){
+    const a = i*Math.PI*2/3;
+    g.add(post(Math.cos(a)*0.135, Math.sin(a)*0.135, 0, 0.400, 0.020, 0.016, MAT.frame, 8));
+  }
+  return g;
+}
+/** High-back booth seat: the sort of thing a consultancy puts a client in. */
+function banquette(fab = MAT.fabricDk){
+  const g = new THREE.Group(), w = 1.60, d = 0.70, bh = 1.35;
+  g.add(lbox(w, d, 0.060, fab, 0, 0, 0.400));
+  lslab(g, -w/2, w/2, -d/2, -d/2+0.12, 0, bh, fab);              // high back
+  for (const s of [-1,1]) lslab(g, s*w/2-s*0.12, s*w/2, -d/2, d/2, 0, 0.95, fab);
+  lslab(g, -w/2+0.05, w/2-0.05, -d/2+0.02, d/2-0.02, 0.06, 0.34, MAT.lamDk);
+  lslab(g, -w/2, w/2, -d/2, -d/2+0.13, bh-0.03, bh, MAT.brass);
+  return g;
+}
+
+/* --- storage ------------------------------------------------------------- */
+function cupboardTall(){
+  const g = carcass(1.00, 0.45, 2.00, 2, MAT.lam, MAT.lam);
+  lslab(g, -0.50, 0.50, -0.462, -0.454, 0.98, 1.00, MAT.frame);   // shelf line
+  return g;
+}
+function tambour(){
+  const g = new THREE.Group(), w = 1.20, d = 0.47, h = 1.20;
+  lslab(g, -w/2, w/2, -d/2, d/2, 0.055, h, MAT.lam);
+  lslab(g, -w/2+0.03, w/2-0.03, -d/2+0.03, d/2-0.03, 0, 0.055, MAT.lamDk);
+  for (let x = -w/2+0.03; x < w/2-0.05; x += 0.035)               // shutter slats
+    lslab(g, x, x+0.028, -d/2-0.014, -d/2-0.006, 0.07, h-0.02, MAT.chrome);
+  lslab(g, -0.06, 0.06, -d/2-0.026, -d/2-0.014, h/2-0.02, h/2+0.02, MAT.brass);
+  lslab(g, -w/2, w/2, -d/2, d/2, h, h+0.022, MAT.walnut);
+  return g;
+}
+function lockers(){
+  const g = new THREE.Group(), w = 0.90, d = 0.45, h = 1.80;
+  lslab(g, -w/2, w/2, -d/2, d/2, 0.055, h, MAT.navy);
+  lslab(g, -w/2+0.03, w/2-0.03, -d/2+0.03, d/2-0.03, 0, 0.055, MAT.lamDk);
+  for (let c=0;c<2;c++) for (let r=0;r<3;r++){
+    const x0 = -w/2 + 0.02 + c*(w/2-0.02), y0 = 0.075 + r*((h-0.11)/3);
+    lslab(g, x0, x0+w/2-0.04, -d/2-0.012, -d/2-0.004, y0, y0+(h-0.11)/3-0.012, MAT.navy);
+    lslab(g, x0+0.05, x0+0.11, -d/2-0.022, -d/2-0.012, y0+0.06, y0+0.085, MAT.brass);
+    lslab(g, x0+w/4-0.06, x0+w/4+0.06, -d/2-0.020, -d/2-0.014,
+          y0+(h-0.11)/3-0.10, y0+(h-0.11)/3-0.07, MAT.chrome);      // vent
+  }
+  return g;
+}
+function bookcase(){
+  const g = new THREE.Group(), w = 1.20, d = 0.32, h = 1.20;
+  for (const s of [-1,1]) lslab(g, s*w/2-s*0.022, s*w/2, -d/2, d/2, 0, h, MAT.walnut);
+  for (let i=0;i<=3;i++){
+    const z = i*(h-0.022)/3;
+    lslab(g, -w/2, w/2, -d/2, d/2, z, z+0.022, MAT.walnut);
+    if (i < 3){
+      let x = -w/2 + 0.05;
+      while (x < w/2 - 0.12){
+        const bw = 0.040 + rnd()*0.070, bh = 0.20 + rnd()*0.09;
+        const col = [0x2C3346, 0x7A5B3C, 0x5B6270, 0x8E8377][(rnd()*4)|0];
+        g.add(lbox(bw, d-0.07, bh, std({ color:col, roughness:0.85 }), x+bw/2, 0, z+0.022));
+        x += bw + 0.006;
+      }
+    }
+  }
+  return g;
+}
+function sideboard(){
+  const g = carcass(1.80, 0.42, 0.78, 3, MAT.walnut, MAT.walnut);
+  lslab(g, -0.90, 0.90, -0.215, 0.215, 0.78, 0.802, MAT.walnut);
+  return g;
+}
+/** Document safe. An MM2H practice holds client passports; they live in this. */
+function safeBox(){
+  const g = new THREE.Group(), w = 0.52, d = 0.48, h = 0.65;
+  lslab(g, -w/2, w/2, -d/2, d/2, 0, h, MAT.lamDk);
+  lslab(g, -w/2+0.03, w/2-0.03, -d/2-0.014, -d/2-0.004, 0.04, h-0.04, MAT.frame);
+  g.add(post(0.10, -d/2-0.030, h/2-0.06, h/2+0.06, 0.055, 0.055, MAT.chrome, 16));
+  lslab(g, -0.16, -0.04, -d/2-0.026, -d/2-0.016, h/2+0.02, h/2+0.10, MAT.screenOff);
+  for (const s of [-1,1]) g.add(post(s*(w/2-0.06), -d/2+0.05, 0, 0.025, 0.024, 0.024, MAT.frame, 8));
+  return g;
+}
+function coatStand(){
+  const g = new THREE.Group(), h = 1.75;
+  g.add(post(0, 0, 0, 0.030, 0.180, 0.170, MAT.frame, 18));
+  g.add(post(0, 0, 0.030, h, 0.024, 0.020, MAT.walnut, 12));
+  for (let i=0;i<4;i++){
+    const a = i*Math.PI/2 + 0.4;
+    g.add(post(Math.cos(a)*0.115, Math.sin(a)*0.115, h-0.16, h-0.02, 0.016, 0.020, MAT.brass, 8));
+  }
+  return g;
+}
+function bins(){
+  const g = new THREE.Group();
+  const cols = [MAT.lamDk, MAT.navy, MAT.frame];
+  for (let i=0;i<3;i++){
+    const x = (i-1)*0.32;
+    g.add(post(x, 0, 0, 0.62, 0.135, 0.150, cols[i], 16));
+    g.add(post(x, 0, 0.62, 0.655, 0.158, 0.150, MAT.lam, 16));
+    lslab(g, x-0.06, x+0.06, -0.01, 0.01, 0.652, 0.658, MAT.lamDk);
+  }
+  return g;
+}
+
+/* --- rooms and screens --------------------------------------------------- */
+/** Two-person glazed meeting pod. Door on local +Y. */
+function meetPod(){
+  const g = new THREE.Group(), w = 2.00, d = 1.60, h = 2.30, t = 0.075;
+  const a = w/2, b = d/2;
+  lslab(g, -a, a, -b, -b+t, 0, h, MAT.lamDk);                    // back
+  lslab(g, -a, -a+t, -b, b, 0, h, MAT.lamDk);
+  lslab(g,  a-t, a, -b, b, 0, h, MAT.lamDk);
+  lslab(g, -a, a, b-t, b, 0, 0.35, MAT.lamDk);                   // door rail
+  lslab(g, -a, -a+t, b-t, b, 0, h, MAT.frame);
+  lslab(g,  a-t, a, b-t, b, 0, h, MAT.frame);
+  lslab(g, -a, a, b-t, b, 2.16, h, MAT.frame);
+  lslab(g, -a+t, a-t, b-0.048, b-0.030, 0.35, 2.16, MAT.glassIn);
+  lslab(g, -a, a, -b, b, h, h+0.055, MAT.lamDk);
+  lslab(g, -a+0.45, a-0.45, -b+0.40, b-0.40, h-0.030, h-0.012, MAT.fixture);
+  lslab(g, -a+t, a-t, -b+t, -b+t+0.012, 0, h-0.06, MAT.navy);
+  const tb = meetTable4(); tb.scale.set(0.85, 1, 0.72); tb.position.set(0, 0, -0.10); g.add(tb);
+  for (const s of [-1,1]){
+    const c = visitorChair(); c.position.set(s*0.55, 0, -0.10);
+    c.rotation.y = s > 0 ? Math.PI/2 : -Math.PI/2; g.add(c);
+  }
+  return g;
+}
+function partitionFull(){
+  const g = new THREE.Group(), w = 1.60, h = 1.80, t = 0.055;
+  lslab(g, -w/2, w/2, -t/2, t/2, 0.06, h, MAT.felt);
+  lslab(g, -w/2, w/2, -t/2-0.005, t/2+0.005, h-0.02, h, MAT.brass);
+  for (const s of [-1,1]) lslab(g, s*(w/2-0.12)-0.03, s*(w/2-0.12)+0.03, -0.16, 0.16, 0, 0.06, MAT.frame);
+  return g;
+}
+function whiteboard(){
+  const g = new THREE.Group(), w = 1.50, h = 1.85;
+  for (const s of [-1,1]){
+    g.add(post(s*(w/2-0.10), 0, 0.05, h, 0.026, 0.022, MAT.chrome, 10));
+    for (const y of [-0.28, 0.28]) g.add(post(s*(w/2-0.10), y, 0, 0.05, 0.026, 0.026, MAT.frame, 8));
+    for (const y of [-0.28, 0.28]) g.add(post(s*(w/2-0.10), y, 0, 0.028, 0.030, 0.030, MAT.frame, 10));
+  }
+  lslab(g, -w/2, w/2, -0.020, 0.020, 0.80, h-0.06, MAT.frame);
+  lslab(g, -w/2+0.02, w/2-0.02, -0.030, -0.021, 0.82, h-0.08, MAT2.white);
+  lslab(g, -w/2+0.10, w/2-0.10, -0.055, -0.020, 0.78, 0.80, MAT.frame);   // pen tray
+  return g;
+}
+function flipchart(){
+  const g = new THREE.Group(), h = 1.75;
+  for (let i=0;i<3;i++){
+    const a = i*Math.PI*2/3 + 0.5;
+    g.add(post(Math.cos(a)*0.30, Math.sin(a)*0.30, 0, h-0.55, 0.018, 0.014, MAT.chrome, 8));
+  }
+  lslab(g, -0.34, 0.34, -0.012, 0.012, h-0.60, h-0.55, MAT.chrome);
+  const p = lbox(0.640, 0.010, 0.880, MAT2.paper, 0, -0.02, h-0.58);
+  p.rotation.x = -0.10; g.add(p);
+  return g;
+}
+function pinboard(){
+  const g = new THREE.Group(), w = 1.20, h = 1.60;
+  for (const s of [-1,1]){
+    g.add(post(s*(w/2-0.06), 0, 0.04, h, 0.024, 0.020, MAT.walnut, 10));
+    for (const y of [-0.22, 0.22]) g.add(post(s*(w/2-0.06), y, 0, 0.04, 0.024, 0.024, MAT.walnut, 8));
+  }
+  lslab(g, -w/2, w/2, -0.018, 0.018, 0.55, h-0.05, MAT.walnut);
+  lslab(g, -w/2+0.03, w/2-0.03, -0.028, -0.019, 0.58, h-0.08, MAT2.cork);
+  for (let i=0;i<5;i++)
+    lslab(g, -w/2+0.10+i*0.20, -w/2+0.24+i*0.20, -0.034, -0.028,
+          0.70+rnd()*0.55, 0.82+rnd()*0.55, MAT2.paper);
+  return g;
+}
+
+/* --- tech and services --------------------------------------------------- */
+function tvStand(){
+  const g = new THREE.Group(), h = 1.65;
+  lslab(g, -0.42, 0.42, -0.24, 0.24, 0, 0.045, MAT.frame);
+  for (const s of [-1,1]) g.add(post(s*0.36, -0.20, 0, 0.030, 0.032, 0.032, MAT.frame, 10));
+  for (const s of [-1,1]) g.add(post(s*0.36,  0.20, 0, 0.030, 0.032, 0.032, MAT.frame, 10));
+  g.add(post(0, 0, 0.045, h, 0.045, 0.038, MAT.frame, 12));
+  lslab(g, -0.62, 0.62, -0.030, 0.020, 0.80, 1.50, MAT.frame);
+  lslab(g, -0.60, 0.60, -0.040, -0.030, 0.82, 1.48, MAT.screenOff);
+  lslab(g, -0.30, 0.30, -0.130, 0.130, 0.55, 0.60, MAT.lamDk);        // shelf
+  return g;
+}
+function waterCooler(){
+  const g = new THREE.Group(), h = 1.05;
+  lslab(g, -0.16, 0.16, -0.16, 0.16, 0, h, MAT.lam);
+  lslab(g, -0.14, 0.14, -0.175, -0.155, h-0.42, h-0.24, MAT.screenOff);
+  g.add(post(0, -0.14, h-0.30, h-0.26, 0.016, 0.016, MAT.chrome, 8));
+  g.add(post(0, 0, h, h+0.40, 0.135, 0.115, MAT.glassIn, 20));
+  g.add(post(0, 0, h+0.40, h+0.46, 0.055, 0.055, MAT.navy, 12));
+  return g;
+}
+function commsRack(){
+  const g = new THREE.Group(), w = 0.60, d = 0.60, h = 1.20;
+  lslab(g, -w/2, w/2, -d/2, d/2, 0.045, h, MAT.frame);
+  lslab(g, -w/2+0.03, w/2-0.03, -d/2-0.012, -d/2-0.004, 0.06, h-0.02, MAT.glassIn);
+  for (let i=0;i<6;i++)
+    lslab(g, -w/2+0.06, w/2-0.06, -d/2+0.02, -d/2+0.05, 0.14+i*0.16, 0.22+i*0.16, MAT.lamDk);
+  for (let i=0;i<6;i++)
+    lslab(g, -w/2+0.09, -w/2+0.13, -d/2+0.015, -d/2+0.03, 0.17+i*0.16, 0.19+i*0.16, MAT2.white);
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    g.add(post(sx*(w/2-0.06), sy*(d/2-0.06), 0, 0.045, 0.026, 0.026, MAT.frame, 8));
+  return g;
+}
+function printerMFD(){
+  const g = new THREE.Group(), w = 0.62, d = 0.66;
+  lslab(g, -w/2, w/2, -d/2, d/2, 0.08, 0.72, MAT.lam);            // paper decks
+  for (let i=0;i<3;i++)
+    lslab(g, -w/2+0.02, w/2-0.02, -d/2-0.010, -d/2-0.004, 0.12+i*0.19, 0.28+i*0.19, MAT.lamDk);
+  lslab(g, -w/2, w/2, -d/2, d/2, 0.72, 1.02, MAT.lamDk);          // engine
+  lslab(g, -w/2+0.04, w/2-0.04, -d/2+0.06, d/2-0.06, 1.02, 1.06, MAT.lam);
+  lslab(g, -0.26, 0.10, -d/2-0.05, -d/2+0.10, 1.06, 1.10, MAT.lamDk);
+  lslab(g, -0.22, 0.02, -d/2-0.040, -d/2-0.030, 1.075, 1.095, MAT.screenOff);
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    g.add(post(sx*(w/2-0.07), sy*(d/2-0.07), 0, 0.08, 0.028, 0.028, MAT.frame, 8));
+  return g;
+}
+function dualMonitors(){
+  const g = new THREE.Group();
+  g.add(lbox(0.260, 0.180, 0.016, MAT.lamDk, 0, 0, 0));
+  g.add(post(0, -0.01, 0.016, 0.230, 0.026, 0.026, MAT.lamDk, 10));
+  lslab(g, -0.30, 0.30, -0.022, -0.010, 0.220, 0.240, MAT.lamDk);
+  for (const s of [-1,1]){
+    const m = lbox(0.520, 0.020, 0.310, MAT.lamDk, s*0.28, -0.030, 0.150);
+    m.rotation.y = -s * 0.20; g.add(m);
+    const f = lbox(0.500, 0.006, 0.288, MAT.screenOff, s*0.28, -0.042, 0.161);
+    f.rotation.y = -s * 0.20; g.add(f);
+  }
+  return g;
+}
+
+/* --- planting and decor -------------------------------------------------- */
+function plantTree(){
+  const g = new THREE.Group(), potH = 0.46, r = 0.30;
+  g.add(post(0, 0, 0, potH, r*0.78, r, MAT.pot, 22));
+  g.add(post(0, 0, potH-0.04, potH-0.02, r*0.96, r*0.96, MAT.soil, 22));
+  g.add(post(0, 0, potH-0.01, potH, r*1.02, r*1.02, MAT.pot, 22));
+  g.add(post(0, 0, potH-0.03, 1.35, 0.045, 0.028, MAT.walnut, 10));   // trunk
+  const f = foliage(0.62, 0.80, 60); f.position.y = 1.15; g.add(f);
+  return g;
+}
+function rug(w, d, mat, round = false){
+  const g = new THREE.Group();
+  if (round) g.add(post(0, 0, 0.002, 0.014, w/2, w/2, mat, 40));
+  else       lslab(g, -w/2, w/2, -d/2, d/2, 0.002, 0.014, mat);
+  return g;
+}
+function floorLamp(){
+  const g = new THREE.Group(), h = 1.62;
+  g.add(post(0, 0, 0, 0.026, 0.155, 0.150, MAT.brass, 20));
+  g.add(post(0, 0, 0.026, h-0.20, 0.016, 0.014, MAT.brass, 10));
+  g.add(post(0, 0, h-0.20, h, 0.190, 0.135, MAT.brass, 22));
+  g.add(post(0, 0, h-0.205, h-0.195, 0.180, 0.180, MAT.fixture, 22));
+  return g;
+}
+function artwork(){
+  const g = new THREE.Group(), w = 0.85, h = 1.10;
+  const p = new THREE.Group();
+  lslab(p, -w/2, w/2, -0.020, 0.020, 0, h, MAT.walnut);
+  lslab(p, -w/2+0.05, w/2-0.05, -0.030, -0.021, 0.05, h-0.05,
+        std({ color:0x8894A6, roughness:0.75 }));
+  lslab(p, -w/2+0.14, w/2-0.14, -0.036, -0.030, 0.22, h-0.30, MAT.navy);
+  p.rotation.x = 0.055; p.position.z = 0.03; g.add(p);
+  return g;
+}
+/** Literature rack — the brochures an MM2H practice puts in its waiting area. */
+function brochureRack(){
+  const g = new THREE.Group(), w = 0.50, h = 1.45;
+  for (const s of [-1,1]) g.add(post(s*(w/2-0.03), 0, 0, h, 0.020, 0.017, MAT.frame, 8));
+  lslab(g, -w/2, w/2, -0.16, 0.16, 0, 0.030, MAT.frame);
+  for (let i=0;i<4;i++){
+    const z = 0.34 + i*0.28;
+    const shelf = lbox(w-0.06, 0.150, 0.016, MAT.frame, 0, -0.045, z);
+    shelf.rotation.x = 0.30; g.add(shelf);
+    const doc = lbox(w-0.14, 0.010, 0.230, MAT2.paper, 0, -0.062, z + 0.012);
+    doc.rotation.x = 0.30; g.add(doc);
+  }
+  return g;
+}
+
+/* --- demountable partitions ----------------------------------------------
+   Internal partitions are not structure. In a real fit-out they are stud or
+   glazed systems that get moved, so here they are layout items like anything
+   else, with a parametric length and an optional door.
+
+   Only the SHELL stays fixed: the corridor wall, the two demising walls, the
+   curtain wall and the 600 x 600 column. Those are base build and surveyed.
+
+   Walls run along local X, thickness in local Y, so rot 0 runs east-west.
+   `door` is the fractional position of a 900 mm opening along the run, or
+   undefined for a solid run. ------------------------------------------------*/
+function wallSegments(len, door){
+  if (door === undefined || door === null || door < 0) return [[-len/2, len/2]];
+  const c = (Math.min(Math.max(door, 0), 1) - 0.5) * len;
+  const a = c - SHELL.DOOR_W/2, b = c + SHELL.DOOR_W/2;
+  const segs = [];
+  if (a > -len/2 + 0.03) segs.push([-len/2, a]);
+  if (b <  len/2 - 0.03) segs.push([b, len/2]);
+  return segs.length ? segs : [];
+}
+function wallSolidPart(len, door, face){
+  const g = new THREE.Group(), t = SHELL.PARTITION_T, h = CH;
+  for (const [a,b] of wallSegments(len, door)){
+    lslab(g, a, b, -t/2, t/2, 0, h, MAT.wall);
+    lslab(g, a, b, -t/2-0.006, -t/2, 0, SHELL.SKIRTING_H, MAT.lamDk);
+    lslab(g, a, b,  t/2, t/2+0.006, 0, SHELL.SKIRTING_H, MAT.lamDk);
+  }
+  if (door !== undefined && door !== null && door >= 0){
+    const c = (Math.min(Math.max(door,0),1) - 0.5) * len;
+    lslab(g, c-SHELL.DOOR_W/2, c+SHELL.DOOR_W/2, -t/2, t/2, SHELL.DOOR_H, h, MAT.wall);
+    lslab(g, c-SHELL.DOOR_W/2, c+SHELL.DOOR_W/2, -t/2-0.005, t/2+0.005,
+          SHELL.DOOR_H-0.02, SHELL.DOOR_H, MAT.brass);
+  }
+  if (face) g.add(face(len));
+  return g;
+}
+function wallGlazedPart(len, door, manif){
+  const g = new THREE.Group(), t = SHELL.PARTITION_T, h = CH, gT = SHELL.GLASS_T;
+  for (const [a,b] of wallSegments(len, door)){
+    const run = b - a, bays = Math.max(1, Math.round(run / 1.30));
+    lslab(g, a, b, -t/2, t/2, 0, 0.055, MAT.frame);
+    lslab(g, a, b, -t/2, t/2, h-0.06, h, MAT.frame);
+    for (let i=0;i<=bays;i++){
+      const p = a + run*i/bays, w = 0.045;
+      lslab(g, Math.max(a, p-w/2), Math.min(b, p+w/2), -t/2, t/2, 0, h, MAT.frame);
+    }
+    lslab(g, a, b, -gT/2, gT/2, 0.055, h-0.06, MAT.glassIn);
+    if (manif) lslab(g, a, b, -gT/2-0.003, gT/2+0.003,
+                     SHELL.MANIF_LO, SHELL.MANIF_HI, MAT.frost);
+  }
+  if (door !== undefined && door !== null && door >= 0){
+    const c = (Math.min(Math.max(door,0),1) - 0.5) * len;
+    const a = c - SHELL.DOOR_W/2, b = c + SHELL.DOOR_W/2;
+    lslab(g, a, b, -t/2, t/2, SHELL.DOOR_H-0.055, SHELL.DOOR_H, MAT.frame);
+    lslab(g, a, b, -gT/2, gT/2, SHELL.DOOR_H, h-0.06, MAT.glassIn);
+    lslab(g, a, b, -t/2, t/2, h-0.06, h, MAT.frame);
+    lslab(g, a, a+0.045, -t/2, t/2, 0, SHELL.DOOR_H, MAT.frame);
+    lslab(g, b-0.045, b, -t/2, t/2, 0, SHELL.DOOR_H, MAT.frame);
+  }
+  return g;
+}
+/** Acoustic timber slats and the backlit wordmark, applied to the +Y face. */
+function wallFeature(len){
+  const g = new THREE.Group(), t = SHELL.PARTITION_T, h = CH;
+  lslab(g, -len/2, len/2, -t/2, t/2, 0, h, MAT.wall);
+  const f = t/2;
+  lslab(g, -len/2, len/2, f, f+0.014, 0, h, MAT.navy);
+  const pitch = 0.09, wS = 0.062;
+  for (let x = -len/2+0.02; x <= len/2-wS-0.02; x += pitch)
+    lslab(g, x, x+wS, f+0.014, f+0.044, 0, h, MAT.slat);
+  const sw = Math.min(1.70, len - 0.30);
+  lslab(g, -sw/2, sw/2, f+0.060, f+0.075, 1.62, 1.92, MAT.sign);
+  lslab(g, -sw/2, sw/2, f+0.060, f+0.078, 1.600, 1.614, MAT.brass);
+  return g;
+}
+/** Solid AV pier: navy acoustic panel one side, a display on the other. */
+function wallPier(len){
+  const g = new THREE.Group(), t = SHELL.PARTITION_T, h = CH;
+  lslab(g, -len/2, len/2, -t/2, t/2, 0, h, MAT.wall);
+  lslab(g, -len/2+0.04, len/2-0.04, t/2, t/2+0.014, 0, h, MAT.navy);
+  const dw = Math.min(1.22, len - 0.08);
+  lslab(g, -dw/2, dw/2, -t/2-0.054, -t/2-0.008, 1.030, 1.720, MAT.frame);
+  lslab(g, -dw/2+0.02, dw/2-0.02, -t/2-0.062, -t/2-0.054, 1.050, 1.700, MAT.screenOff);
+  lslab(g, -dw/2+0.18, dw/2-0.18, -t/2-0.072, -t/2-0.010, 0.900, 0.968, MAT.lamDk);
+  return g;
+}
+
 /* ==========================================================================
    5b. CATALOGUE AND LAYOUT
    --------------------------------------------------------------------------
@@ -1588,13 +2093,99 @@ const CATALOG = {
   planter_sm       : { name:'Planter, small',      cat:'Planting', foot:[0.46, 0.46, 1.20],  make:()=>planter(0.230, 0.440, 0.780) },
   planter_tall     : { name:'Planter, slim',       cat:'Planting', foot:[0.52, 0.52, 1.60],  make:()=>planter(0.260, 0.520, 1.150) },
   desk_plant       : { name:'Desk plant',          cat:'Planting', foot:[0.22, 0.22, 0.30],  z:DIM.DESK_H, make:()=>deskPlant() },
-  laptop           : { name:'Laptop',              cat:'Planting', foot:[0.33, 0.24, 0.24],  z:DIM.DESK_H, make:()=>laptopProp() },
+  plant_tree       : { name:'Indoor tree',         cat:'Planting', foot:[1.10, 1.10, 1.95],  make:()=>plantTree() },
+
+  laptop           : { name:'Laptop',              cat:'Tech',     foot:[0.33, 0.24, 0.24],  z:DIM.DESK_H, make:()=>laptopProp() },
+
+  /* ---- second wave -------------------------------------------------- */
+  desk_l           : { name:'L-desk with return',  cat:'Desks',    foot:[1.60, 1.55, DIM.DESK_H], make:()=>deskL() },
+  desk_single      : { name:'Desk, 1400',          cat:'Desks',    foot:[1.40, 0.70, DIM.DESK_H], make:()=>deskSingle() },
+  conf_table_8     : { name:'Boardroom table, 8',  cat:'Desks',    foot:[3.20, 1.20, 0.74],  make:()=>confTable8() },
+  meet_table_4     : { name:'Meeting table, 4',    cat:'Desks',    foot:[1.20, 1.20, 0.74],  make:()=>meetTable4() },
+  poseur_table     : { name:'Poseur table',        cat:'Desks',    foot:[0.84, 0.84, 1.05],  make:()=>poseurTable() },
+  training_table   : { name:'Training table',      cat:'Desks',    foot:[1.40, 0.60, DIM.DESK_H], make:()=>trainingTable() },
+  bench_table      : { name:'Communal table',      cat:'Desks',    foot:[2.40, 0.90, 0.74],  make:()=>benchTable() },
+
+  visitor_chair    : { name:'Visitor chair',       cat:'Seating',  foot:[0.48, 0.46, 0.92],  make:()=>visitorChair() },
+  bar_stool        : { name:'Bar stool',           cat:'Seating',  foot:[0.42, 0.42, 1.07],  make:()=>barStool() },
+  lounge_chair     : { name:'Lounge chair',        cat:'Seating',  foot:[0.90, 0.86, 0.78],  make:()=>loungeChair() },
+  sofa3            : { name:'Sofa, 3-seat',        cat:'Seating',  foot:[2.20, 0.85, 0.78],  make:()=>sofa3() },
+  bench_uph        : { name:'Bench, upholstered',  cat:'Seating',  foot:[1.60, 0.42, 0.44],  make:()=>benchUph() },
+  ottoman          : { name:'Ottoman',             cat:'Seating',  foot:[0.52, 0.52, 0.41],  make:()=>ottoman() },
+  stool_low        : { name:'Low stool',           cat:'Seating',  foot:[0.40, 0.40, 0.44],  make:()=>stoolLow() },
+  banquette        : { name:'Booth seat',          cat:'Seating',  foot:[1.60, 0.70, 1.35],  make:()=>banquette() },
+
+  cupboard_tall    : { name:'Cupboard, tall',      cat:'Storage',  foot:[1.00, 0.45, 2.00],  make:()=>cupboardTall() },
+  tambour          : { name:'Tambour unit',        cat:'Storage',  foot:[1.20, 0.47, 1.22],  make:()=>tambour() },
+  lockers          : { name:'Lockers, 6',          cat:'Storage',  foot:[0.90, 0.45, 1.80],  make:()=>lockers() },
+  bookcase         : { name:'Bookcase, low',       cat:'Storage',  foot:[1.20, 0.32, 1.20],  make:()=>bookcase() },
+  sideboard        : { name:'Sideboard',           cat:'Storage',  foot:[1.80, 0.42, 0.80],  make:()=>sideboard() },
+  safe             : { name:'Document safe',       cat:'Storage',  foot:[0.52, 0.48, 0.65],  make:()=>safeBox() },
+  coat_stand       : { name:'Coat stand',          cat:'Storage',  foot:[0.40, 0.40, 1.75],  make:()=>coatStand() },
+  bins             : { name:'Recycling bins',      cat:'Storage',  foot:[0.96, 0.32, 0.66],  make:()=>bins() },
+
+  meet_pod         : { name:'Meeting pod, 2',      cat:'Rooms',    foot:[2.00, 1.60, 2.36],  make:()=>meetPod() },
+  partition_full   : { name:'Partition screen',    cat:'Rooms',    foot:[1.60, 0.34, 1.80],  make:()=>partitionFull() },
+  whiteboard       : { name:'Whiteboard, mobile',  cat:'Rooms',    foot:[1.50, 0.62, 1.85],  make:()=>whiteboard() },
+  flipchart        : { name:'Flipchart easel',     cat:'Rooms',    foot:[0.68, 0.62, 1.75],  make:()=>flipchart() },
+  pinboard         : { name:'Pinboard',            cat:'Rooms',    foot:[1.20, 0.48, 1.60],  make:()=>pinboard() },
+
+  tv_stand         : { name:'Display on stand',    cat:'Tech',     foot:[1.24, 0.48, 1.65],  make:()=>tvStand() },
+  water_cooler     : { name:'Water cooler',        cat:'Tech',     foot:[0.36, 0.36, 1.51],  make:()=>waterCooler() },
+  comms_rack       : { name:'Comms cabinet',       cat:'Tech',     foot:[0.60, 0.60, 1.20],  make:()=>commsRack() },
+  printer_mfd      : { name:'Copier, floor',       cat:'Tech',     foot:[0.62, 0.66, 1.10],  make:()=>printerMFD() },
+  dual_monitors    : { name:'Dual monitors',       cat:'Tech',     foot:[0.86, 0.24, 0.34],  z:DIM.DESK_H, make:()=>dualMonitors() },
+
+  rug_rect         : { name:'Rug, 2.0 × 1.4',      cat:'Decor',    foot:[2.00, 1.40, 0.02],  make:()=>rug(2.00, 1.40, MAT2.rugNavy) },
+  rug_sand         : { name:'Rug, sand',           cat:'Decor',    foot:[1.80, 1.20, 0.02],  make:()=>rug(1.80, 1.20, MAT2.rugSand) },
+  rug_round        : { name:'Rug, round 1.8',      cat:'Decor',    foot:[1.80, 1.80, 0.02],  make:()=>rug(1.80, 1.80, MAT2.rugNavy, true) },
+  floor_lamp       : { name:'Floor lamp',          cat:'Decor',    foot:[0.34, 0.34, 1.62],  make:()=>floorLamp() },
+  artwork          : { name:'Framed artwork',      cat:'Decor',    foot:[0.85, 0.16, 1.10],  make:()=>artwork() },
+  brochure_rack    : { name:'Literature rack',     cat:'Decor',    foot:[0.50, 0.34, 1.45],  make:()=>brochureRack() },
+
+  /* ---- demountable partitions ---------------------------------------
+     `wall:true` marks these as partitions: parametric length, optional door,
+     multi-part colliders, and clash targets for everything that is not a
+     wall. `len` is the default the palette drops in at. ------------------ */
+  wall_solid       : { name:'Partition, solid',    cat:'Walls', wall:true, len:3.00,
+                       foot:[3.00, SHELL.PARTITION_T, CH],
+                       make:it=>wallSolidPart(it.len, it.door) },
+  wall_glazed      : { name:'Partition, glazed',   cat:'Walls', wall:true, len:3.00,
+                       foot:[3.00, SHELL.PARTITION_T, CH],
+                       make:it=>wallGlazedPart(it.len, it.door, false) },
+  wall_glazed_frost: { name:'Glazed + frosted band',cat:'Walls', wall:true, len:3.00,
+                       foot:[3.00, SHELL.PARTITION_T, CH],
+                       make:it=>wallGlazedPart(it.len, it.door, true) },
+  wall_feature     : { name:'Slat feature wall',   cat:'Walls', wall:true, len:1.85,
+                       foot:[1.85, SHELL.PARTITION_T, CH],
+                       make:it=>wallFeature(it.len) },
+  wall_pier        : { name:'AV pier',             cat:'Walls', wall:true, len:1.30,
+                       foot:[1.30, SHELL.PARTITION_T, CH],
+                       make:it=>wallPier(it.len) },
 };
 
 /* ---- The designed fit-out, as data --------------------------------------
    This is the layout the walkthrough opens with and the one "Reset" returns
    to. Editing never touches it; edits live in localStorage. ---------------- */
 const DEFAULT_LAYOUT = [
+  // ---- demountable partitions, as designed -------------------------------
+  // store: solid back-of-house box on the corridor wall
+  { type:'wall_solid',        x:1.5225, y:2.300,  rot:0,  len:3.045, door:0.197 },
+  { type:'wall_solid',        x:3.000,  y:1.1275, rot:90, len:2.255 },
+  { type:'wall_feature',      x:2.075,  y:2.322,  rot:0,  len:1.850 },
+  // pantry nook: a short return, then a solid flank
+  { type:'wall_solid',        x:0.650,  y:7.000,  rot:0,  len:1.300 },
+  { type:'wall_solid',        x:3.000,  y:8.0275, rot:90, len:2.145 },
+  // meeting room: glazed, solid AV pier, glazed, door in the corner
+  { type:'wall_glazed',       x:6.700,  y:0.650,  rot:90, len:1.300 },
+  { type:'wall_pier',         x:6.700,  y:1.950,  rot:90, len:1.300 },
+  { type:'wall_glazed',       x:6.700,  y:3.250,  rot:90, len:1.300, door:0.654 },
+  // these two stop at the curtain wall's inner framing (x = 10.235) rather
+  // than the glass line, so they abut the facade instead of overlapping it
+  { type:'wall_glazed',       x:8.445,  y:3.900,  rot:0,  len:3.580 },
+  // director's office: glazed with a frosted band at seated height
+  { type:'wall_glazed_frost', x:8.445,  y:6.250,  rot:0,  len:3.580, door:0.180 },
+  { type:'wall_glazed_frost', x:6.700,  y:7.6525, rot:90, len:2.895 },
   // reception & waiting
   { type:'task_chair',    x:2.10, y:2.76, rot:0   },
   { type:'sofa2',         x:0.45, y:6.15, rot:270 },
@@ -1683,7 +2274,7 @@ const DEFAULT_LAYOUT = [
 
 const G_ITEMS = new THREE.Group(); G_ITEMS.name = 'layout'; ROOT.add(G_ITEMS);
 const G_BADGE = new THREE.Group(); ROOT.add(G_BADGE);   // selection + clash boxes
-let selectedId = null;             // set by the editor in section 8b
+const selection = new Set();       // ids currently selected; driven by section 8b
 
 let LAYOUT = [];                      // live layout
 const itemGroups = new Map();         // id -> THREE.Group
@@ -1699,7 +2290,7 @@ function normaliseItem(raw){
   const def = raw && CATALOG[raw.type];
   if (!def) return null;
   const n = v => (Number.isFinite(+v) ? +v : 0);
-  return {
+  const it = {
     id  : raw.id || newId(),
     type: raw.type,
     x   : Math.min(Math.max(n(raw.x), 0), W),
@@ -1707,6 +2298,52 @@ function normaliseItem(raw){
     rot : ((n(raw.rot) % 360) + 360) % 360,
     z   : raw.z !== undefined ? n(raw.z) : (def.z || 0),
   };
+  if (def.wall){                       // partitions carry a length and a door
+    it.len = Math.min(Math.max(raw.len !== undefined ? n(raw.len) : def.len, 0.30),
+                      Math.hypot(W, D));
+    if (raw.door !== undefined && raw.door !== null && n(raw.door) >= 0)
+      it.door = Math.min(Math.max(n(raw.door), 0), 1);
+  }
+  if (raw.finish && Object.prototype.hasOwnProperty.call(FINISHES, raw.finish))
+    it.finish = raw.finish;
+  return it;
+}
+
+/** Local rectangle -> world axis-aligned box, for a piece rotated by it.rot.
+    local +X maps to (cos, sin); local +Y maps to (-sin, cos). */
+function localRectAABB(it, lx0, lx1, ly0, ly1, z0, z1, name){
+  const a = it.rot * Math.PI/180, c = Math.cos(a), s = Math.sin(a);
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const [px, py] of [[lx0,ly0],[lx1,ly0],[lx1,ly1],[lx0,ly1]]){
+    const wx = it.x + px*c - py*s, wy = it.y + px*s + py*c;
+    x0 = Math.min(x0, wx); x1 = Math.max(x1, wx);
+    y0 = Math.min(y0, wy); y1 = Math.max(y1, wy);
+  }
+  return { x0, x1, y0, y1, z0, z1, name, kind:'furn', id:it.id };
+}
+
+/** Boxes a piece contributes to collision. A wall with a door contributes one
+    per solid run, so the doorway stays walkable — a single box would seal it. */
+function itemBoxes(it){
+  const def = CATALOG[it.type];
+  if (!def) return [];
+  if (!def.wall) return [itemAABB(it)];
+  const t = SHELL.PARTITION_T;
+  return wallSegments(it.len, it.door)
+    .map(([a,b]) => localRectAABB(it, a, b, -t/2, t/2, 0, CH, def.name));
+}
+/** Oriented boxes for clash reporting, same segmentation. */
+function obbsOf(it){
+  const def = CATALOG[it.type];
+  if (!def) return [];
+  if (!def.wall) return [obbOf(it)];
+  const t = SHELL.PARTITION_T, a = it.rot * Math.PI/180;
+  const c = Math.cos(a), s = Math.sin(a);
+  return wallSegments(it.len, it.door).map(([p, q]) => {
+    const mid = (p + q) / 2;
+    return { cx: it.x + mid*c, cy: it.y + mid*s,
+             hw: (q - p)/2, hd: t/2, c, s, z0: 0, z1: CH };
+  });
 }
 
 /** Conservative axis-aligned box for a rotated footprint. Used for walk
@@ -1750,21 +2387,74 @@ function obbOverlap(A, B, tol = 0.004){
    and it matches what section 9c has always checked. ---------------------- */
 function validateLayout(){
   const shell = COLLIDERS.filter(c => c.kind === 'shell').map(obbOfAABB);
+  // Partitions are movable now, so furniture is checked against wherever the
+  // walls currently are, not against where they were designed. Walls are only
+  // checked against the shell — two partitions meeting at a corner is a
+  // junction, not a clash.
+  const wallObbs = [];
+  for (const it of LAYOUT) if (CATALOG[it.type]?.wall) wallObbs.push(...obbsOf(it));
   const bad = new Set();
   for (const it of LAYOUT){
-    const box = itemAABB(it);
-    if (box.x0 < -0.002 || box.x1 > W + 0.002 ||
-        box.y0 < -0.002 || box.y1 > D + 0.002){ bad.add(it.id); continue; }
-    const A = obbOf(it);
-    for (const s of shell) if (obbOverlap(A, s)){ bad.add(it.id); break; }
+    const def = CATALOG[it.type]; if (!def) continue;
+    const boxes = itemBoxes(it);
+    if (boxes.some(b => b.x0 < -0.002 || b.x1 > W + 0.002 ||
+                        b.y0 < -0.002 || b.y1 > D + 0.002)){ bad.add(it.id); continue; }
+    const mine = obbsOf(it);
+    let hit = false;
+    for (const A of mine){
+      for (const s of shell) if (obbOverlap(A, s)){ hit = true; break; }
+      if (hit) break;
+      if (!def.wall) for (const w of wallObbs) if (obbOverlap(A, w)){ hit = true; break; }
+      if (hit) break;
+    }
+    if (hit) bad.add(it.id);
   }
   return bad;
+}
+
+/* --- finishes -------------------------------------------------------------
+   A piece can be re-surfaced without authoring a variant of it. Applying a
+   finish swaps the material on the meshes that make up a piece's BODY and
+   leaves the details alone — brass pulls stay brass, glass stays glass,
+   screens stay black — so an oak credenza keeps its handles. --------------- */
+const FINISHES = {
+  ''        : { name:'As designed', mat:null },
+  oak       : { name:'Light oak',   mat:()=>MAT.oak },
+  walnut    : { name:'Walnut',      mat:()=>MAT.walnut },
+  white     : { name:'White lam',   mat:()=>MAT.lam },
+  charcoal  : { name:'Charcoal',    mat:()=>MAT.lamDk },
+  navy      : { name:'Navy',        mat:()=>MAT.navy },
+  warmwhite : { name:'Warm white',  mat:()=>MAT.wall },
+  fabric    : { name:'Grey fabric', mat:()=>MAT.fabric },
+  felt      : { name:'Blue felt',   mat:()=>MAT2.felt },
+  sand      : { name:'Sand',        mat:()=>MAT2.rugSand },
+  slat      : { name:'Timber slat', mat:()=>MAT.slat },
+  black     : { name:'Black',       mat:()=>MAT.frame },
+  brass     : { name:'Brass',       mat:()=>MAT.brass },
+};
+/** Only body materials are swapped. Anything not in here is a detail. */
+let RECOLOURABLE = null;
+function recolourable(){
+  if (!RECOLOURABLE) RECOLOURABLE = new Set([
+    MAT.oak, MAT.walnut, MAT.lam, MAT.lamDk, MAT.navy, MAT.wall, MAT.wallSide,
+    MAT.fabric, MAT.fabricDk, MAT.leather, MAT.slat,
+    MAT2.felt, MAT2.rugNavy, MAT2.rugSand, MAT2.white,
+  ]);
+  return RECOLOURABLE;
+}
+function applyFinish(group, key){
+  const f = FINISHES[key];
+  if (!f || !f.mat) return;
+  const swap = f.mat(), ok = recolourable();
+  group.traverse(o => { if (o.isMesh && ok.has(o.material)) o.material = swap; });
 }
 
 function buildItem(it){
   const u = unit(it.x, it.y, it.rot);
   u.position.y = it.z;
-  u.add(CATALOG[it.type].make());
+  const body = CATALOG[it.type].make(it);   // walls read len/door off the item
+  if (it.finish) applyFinish(body, it.finish);
+  u.add(body);
   u.userData.itemId = it.id;
   u.traverse(o => { o.userData.itemId = it.id; });
   return u;
@@ -1793,7 +2483,7 @@ function renderLayout(){
     validation, and the red boxes that mark whatever is fouling the shell. */
 const BADGE_BAD = 0xE2564B, BADGE_SEL = C.BRASS;
 function afterLayoutChange(){
-  itemColliders = LAYOUT.map(itemAABB);
+  itemColliders = LAYOUT.flatMap(itemBoxes);
   walkSolids = allColliders().filter(c => c.z1 > 0.32 && c.z0 < CAM.EYE_H + 0.10);
   badItems = validateLayout();
   drawBadges();
@@ -1819,7 +2509,7 @@ function drawBadges(){
   }
   for (const it of LAYOUT){
     if (badItems.has(it.id))         G_BADGE.add(boxHelperFor(it, BADGE_BAD));
-    else if (it.id === selectedId)   G_BADGE.add(boxHelperFor(it, BADGE_SEL));
+    else if (selection.has(it.id))   G_BADGE.add(boxHelperFor(it, BADGE_SEL));
   }
 }
 
@@ -2171,11 +2861,22 @@ plc.addEventListener('unlock', () => {
   keys.w = keys.a = keys.s = keys.d = keys.shift = false;
 });
 
+/** True while the keystroke belongs to a form field. Every global shortcut
+    checks this first: without it, typing "Saved layout" into the gallery title
+    swallowed the W/A/S/D and the digits switched view mode mid-word. */
+function isTyping(e){
+  const t = e.target;
+  if (!t) return false;
+  return /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable === true;
+}
+
 addEventListener('keydown', e => {
+  if (isTyping(e)) return;
   if (e.code === 'Digit1') return setMode('walk');
   if (e.code === 'Digit2') return setMode('top');
   if (e.code === 'Digit3') return setMode('orbit');
-  if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; e.preventDefault(); }
+  // movement is only ever wanted in walk mode; elsewhere the keys stay free
+  if (MODE === 'walk' && KEYMAP[e.code]){ keys[KEYMAP[e.code]] = true; e.preventDefault(); }
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
 });
 addEventListener('keyup', e => {
@@ -2304,29 +3005,65 @@ function pickAt(cx, cy){
   const hits = ray.intersectObjects(G_ITEMS.children, true);
   return hits.length ? hits[0].object.userData.itemId : null;
 }
-function select(id){
-  selectedId = id;
-  const it = id ? findItem(id) : null;
-  if (it){
-    gizmo.attach(itemGroups.get(id));
-    gizmo.visible = true;
-  } else {
-    gizmo.detach();
-    gizmo.visible = false;
-  }
-  drawBadges();
-  renderProps();
+/* Multi-selection. TransformControls only ever drives ONE object, so it is
+   attached to an empty pivot placed at the centroid of whatever is selected;
+   dragging the pivot applies the same delta to every selected piece. */
+const pivot = new THREE.Object3D();
+scene.add(pivot);
+let dragBase = null;
+
+function syncGizmo(){
+  if (!selection.size){ gizmo.detach(); gizmo.visible = false; return; }
+  let cx = 0, cy = 0, n = 0;
+  for (const id of selection){ const it = findItem(id); if (it){ cx += it.x; cy += it.y; n++; } }
+  if (!n){ gizmo.detach(); gizmo.visible = false; return; }
+  pivot.position.set(cx/n, 0, cy/n);
+  pivot.rotation.set(0, 0, 0);
+  gizmo.attach(pivot);
+  gizmo.visible = true;
 }
+/** select(id) replaces the selection; select(id, true) toggles it in or out. */
+function select(id, additive = false){
+  if (id === null || id === undefined){ selection.clear(); }
+  else if (additive){ selection.has(id) ? selection.delete(id) : selection.add(id); }
+  else { selection.clear(); selection.add(id); }
+  syncGizmo(); drawBadges(); renderProps();
+}
+function selectMany(ids, additive = false){
+  if (!additive) selection.clear();
+  for (const id of ids) selection.add(id);
+  syncGizmo(); drawBadges(); renderProps();
+}
+const firstSelected = () => (selection.size ? findItem([...selection][0]) : null);
 
 function renderProps(){
   // never rebuild the panel out from under someone typing in it
   if (elProps.contains(document.activeElement) &&
       document.activeElement.tagName === 'INPUT') return;
-  const it = selectedId ? findItem(selectedId) : null;
-  if (!it){
-    elProps.innerHTML = '<div class="none">Nothing selected &mdash; click a piece.</div>';
+  if (!selection.size){
+    elProps.innerHTML = '<div class="none">Nothing selected &mdash; click a piece. ' +
+                        'Shift-click to add, Shift-drag to sweep, Ctrl+A for everything.</div>';
     return;
   }
+  const finishOptions = f => Object.entries(FINISHES)
+    .map(([k,v]) => `<option value="${k}"${k === (f||'') ? ' selected' : ''}>${v.name}</option>`)
+    .join('');
+
+  if (selection.size > 1){
+    const nBad = [...selection].filter(id => badItems.has(id)).length;
+    elProps.innerHTML =
+      `<div class="name">${selection.size} pieces selected` +
+      (nBad ? ` &nbsp;<span style="color:#E2564B">${nBad} clashing</span>` : '') + `</div>` +
+      `<div style="margin-bottom:6px">Drag the gizmo to move or turn them together.</div>` +
+      `<label>Finish <select id="pF">${finishOptions('')}</select></label>` +
+      `<div class="row" style="margin-top:6px"><button id="pDup">Duplicate</button>` +
+      `<button id="pDel" class="warn">Delete</button></div>`;
+    $('pF').onchange = () => setFinish($('pF').value);
+    $('pDup').onclick = () => duplicateSelected();
+    $('pDel').onclick = () => deleteSelected();
+    return;
+  }
+  const it = firstSelected();
   const def = CATALOG[it.type];
   const bad = badItems.has(it.id);
   elProps.innerHTML =
@@ -2334,6 +3071,12 @@ function renderProps(){
     `<label>X <input id="pX" type="number" step="0.05" value="${it.x.toFixed(2)}"></label>` +
     `<label>Y <input id="pY" type="number" step="0.05" value="${it.y.toFixed(2)}"></label>` +
     `<label>&deg; <input id="pR" type="number" step="15" value="${it.rot.toFixed(0)}"></label>` +
+    (def.wall
+      ? `<label>Len <input id="pL" type="number" step="0.05" min="0.3" value="${it.len.toFixed(2)}"></label>` +
+        `<label>Door <input id="pDoor" type="number" step="0.05" min="-1" max="1" ` +
+        `value="${it.door === undefined ? -1 : it.door.toFixed(2)}"></label>`
+      : '') +
+    `<label>Finish <select id="pF">${finishOptions(it.finish)}</select></label>` +
     `<div class="row" style="margin-top:6px">` +
       `<button id="pDup">Duplicate</button><button id="pDel" class="warn">Delete</button></div>`;
   const commit = () => {
@@ -2343,12 +3086,43 @@ function renderProps(){
     if (Number.isFinite(nx)) it.x = Math.min(Math.max(nx, 0), W);
     if (Number.isFinite(ny)) it.y = Math.min(Math.max(ny, 0), D);
     if (Number.isFinite(nr)) it.rot = ((nr % 360) + 360) % 360;
-    syncItem(it); afterLayoutChange(); saveLocal(); renderProps();
+    let rebuilt = false;
+    if (def.wall){
+      const nl = parseFloat($('pL').value), nd = parseFloat($('pDoor').value);
+      if (Number.isFinite(nl)) it.len = Math.min(Math.max(nl, 0.30), Math.hypot(W, D));
+      if (Number.isFinite(nd)){
+        if (nd < 0) delete it.door; else it.door = Math.min(Math.max(nd, 0), 1);
+      }
+      rebuilt = true;                    // geometry depends on len/door
+    }
+    if (rebuilt) rebuildItem(it); else syncItem(it);
+    afterLayoutChange(); saveLocal(); renderProps();
   };
-  for (const id of ['pX','pY','pR'])
+  for (const id of ['pX','pY','pR', ...(def.wall ? ['pL','pDoor'] : [])])
     $(id).addEventListener('change', commit);
+  $('pF').onchange = () => setFinish($('pF').value);
   $('pDup').onclick = () => duplicateSelected();
   $('pDel').onclick = () => deleteSelected();
+}
+
+/** Rebuild one item's geometry in place — needed when a parameter changes the
+    shape rather than just where it sits. */
+function rebuildItem(it){
+  const old = itemGroups.get(it.id);
+  if (old){ G_ITEMS.remove(old); disposeGroup(old); }
+  const g = buildItem(it);
+  itemGroups.set(it.id, g);
+  G_ITEMS.add(g);
+}
+function setFinish(key){
+  if (!selection.size) return;
+  pushHistory();
+  for (const id of selection){
+    const it = findItem(id); if (!it) continue;
+    if (key) it.finish = key; else delete it.finish;
+    rebuildItem(it);
+  }
+  afterLayoutChange(); saveLocal();
 }
 
 /* --- 8b-iii. mutations --------------------------------------------------- */
@@ -2362,21 +3136,72 @@ function addItem(type, at){
   afterLayoutChange(); saveLocal(); select(it.id);
 }
 function deleteSelected(){
-  const it = selectedId && findItem(selectedId); if (!it) return;
+  if (!selection.size) return;
   pushHistory();
-  const g = itemGroups.get(it.id);
-  if (g){ G_ITEMS.remove(g); disposeGroup(g); itemGroups.delete(it.id); }
-  LAYOUT = LAYOUT.filter(o => o.id !== it.id);
+  for (const id of selection){
+    const g = itemGroups.get(id);
+    if (g){ G_ITEMS.remove(g); disposeGroup(g); itemGroups.delete(id); }
+  }
+  LAYOUT = LAYOUT.filter(o => !selection.has(o.id));
   select(null); afterLayoutChange(); saveLocal();
 }
 function duplicateSelected(){
-  const it = selectedId && findItem(selectedId); if (!it) return;
+  if (!selection.size) return;
   pushHistory();
-  const copy = normaliseItem({ ...it, id:null, x:it.x + 0.30, y:it.y + 0.30 });
-  LAYOUT.push(copy);
-  const g = buildItem(copy); itemGroups.set(copy.id, g); G_ITEMS.add(g);
-  afterLayoutChange(); saveLocal(); select(copy.id);
+  const made = [];
+  for (const id of selection){
+    const it = findItem(id); if (!it) continue;
+    const copy = normaliseItem({ ...it, id:null, x:it.x + 0.30, y:it.y + 0.30 });
+    LAYOUT.push(copy);
+    const g = buildItem(copy); itemGroups.set(copy.id, g); G_ITEMS.add(g);
+    made.push(copy.id);
+  }
+  afterLayoutChange(); saveLocal(); selectMany(made);
 }
+/* --- clipboard -----------------------------------------------------------
+   Copies keep each piece's offset from the selection centroid, so pasting a
+   group puts it back in the same arrangement rather than stacking it. -------*/
+let clipboard = [];
+function copySelected(){
+  if (!selection.size) return;
+  const items = [...selection].map(findItem).filter(Boolean);
+  const cx = items.reduce((s,i)=>s+i.x,0)/items.length;
+  const cy = items.reduce((s,i)=>s+i.y,0)/items.length;
+  clipboard = items.map(i => ({ type:i.type, dx:i.x-cx, dy:i.y-cy,
+                                rot:i.rot, z:i.z, len:i.len, door:i.door }));
+  flashEditor(`${items.length} copied`);
+}
+function cutSelected(){
+  if (!selection.size) return;
+  copySelected();
+  deleteSelected();
+}
+function pasteClipboard(){
+  if (!clipboard.length) return;
+  const p = viewCentre();
+  pushHistory();
+  const made = [];
+  for (const c of clipboard){
+    const it = normaliseItem({ type:c.type, x:p.x + c.dx, y:p.y + c.dy,
+                               rot:c.rot, z:c.z, len:c.len, door:c.door });
+    if (!it) continue;
+    LAYOUT.push(it);
+    const g = buildItem(it); itemGroups.set(it.id, g); G_ITEMS.add(g);
+    made.push(it.id);
+  }
+  afterLayoutChange(); saveLocal(); selectMany(made);
+  flashEditor(`${made.length} pasted`);
+}
+/** A short-lived note in the editor's clash line, for actions with no other
+    visible feedback. */
+let flashTimer = 0;
+function flashEditor(msg){
+  elClash.className = '';
+  elClash.textContent = msg;
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { for (const fn of layoutListeners) fn(); }, 1400);
+}
+
 /** Where a newly added piece lands: the middle of what you are looking at,
     clamped inside the parcel so it never appears out in the city. */
 function viewCentre(){
@@ -2455,45 +3280,151 @@ function setGizmoMode(m){
 gizmo.addEventListener('dragging-changed', e => {
   orbit.enabled = (MODE === 'orbit') && !e.value;
   topDragBlocked = e.value;
-  if (!e.value){ afterLayoutChange(); saveLocal(); renderProps(); }
-  else pushHistory();
+  if (e.value){
+    pushHistory();
+    // snapshot every selected piece relative to the pivot's starting transform
+    dragBase = {
+      px: pivot.position.x, py: pivot.position.z,
+      items: [...selection].map(id => { const it = findItem(id);
+        return it && { id, x:it.x, y:it.y, rot:it.rot }; }).filter(Boolean),
+    };
+  } else {
+    dragBase = null;
+    syncGizmo();                     // re-centre on where things ended up
+    afterLayoutChange(); saveLocal(); renderProps();
+  }
 });
 gizmo.addEventListener('objectChange', () => {
-  const it = selectedId && findItem(selectedId); if (!it) return;
-  const g = itemGroups.get(it.id);
-  let x = g.position.x, y = g.position.z;
-  let rot = ((-g.rotation.y * 180/Math.PI) % 360 + 360) % 360;
-  if (snapping){
-    x = Math.round(x / SNAP_XY) * SNAP_XY;
-    y = Math.round(y / SNAP_XY) * SNAP_XY;
-    rot = Math.round(rot / SNAP_DEG) * SNAP_DEG;
+  if (!dragBase) return;
+  if (gizmoMode === 'translate'){
+    let dx = pivot.position.x - dragBase.px;
+    let dy = pivot.position.z - dragBase.py;
+    if (snapping){
+      dx = Math.round(dx / SNAP_XY) * SNAP_XY;
+      dy = Math.round(dy / SNAP_XY) * SNAP_XY;
+    }
+    for (const b of dragBase.items){
+      const it = findItem(b.id); if (!it) continue;
+      it.x = clamp(b.x + dx, 0, W);
+      it.y = clamp(b.y + dy, 0, D);
+      syncItem(it);
+    }
+  } else {
+    let deg = ((-pivot.rotation.y * 180/Math.PI) % 360 + 360) % 360;
+    if (deg > 180) deg -= 360;                       // shortest way round
+    if (snapping) deg = Math.round(deg / SNAP_DEG) * SNAP_DEG;
+    const a = deg * Math.PI/180, c = Math.cos(a), s = Math.sin(a);
+    for (const b of dragBase.items){
+      const it = findItem(b.id); if (!it) continue;
+      const ox = b.x - dragBase.px, oy = b.y - dragBase.py;
+      it.x = clamp(dragBase.px + ox*c - oy*s, 0, W);
+      it.y = clamp(dragBase.py + ox*s + oy*c, 0, D);
+      it.rot = ((b.rot + deg) % 360 + 360) % 360;
+      syncItem(it);
+    }
   }
-  it.x = clamp(x, 0, W); it.y = clamp(y, 0, D); it.rot = rot % 360;
-  syncItem(it);
-  itemColliders = LAYOUT.map(itemAABB);
+  itemColliders = LAYOUT.flatMap(itemBoxes);
   badItems = validateLayout();
   drawBadges();
 });
 
 /* --- 8b-vi. wiring ------------------------------------------------------- */
-function buildPalette(){
+/* --- palette thumbnails --------------------------------------------------
+   Each tile is a real render of the same procedural geometry the scene uses,
+   done once in a throwaway WebGL context and kept as a data URL. Nothing is
+   fetched, so the palette still works with no network. Generated the first
+   time the editor opens rather than at load, so start-up stays quick. -------*/
+const THUMBS = {};
+let thumbsDone = false;
+function makeThumbnails(){
+  if (thumbsDone) return;
+  thumbsDone = true;
+  const S = 96;
+  let r;
+  try {
+    r = new THREE.WebGLRenderer({ antialias:true, alpha:true, preserveDrawingBuffer:true });
+  } catch (e){
+    console.warn('No second WebGL context for palette thumbnails:', e.message);
+    return;                                  // palette falls back to text
+  }
+  r.setPixelRatio(1);
+  r.setSize(S, S);
+  r.setClearAlpha(0);
+  r.outputColorSpace = THREE.SRGBColorSpace;
+  r.toneMapping = THREE.ACESFilmicToneMapping;
+  r.toneMappingExposure = 1.15;
+
+  const sc = new THREE.Scene();
+  sc.add(new THREE.HemisphereLight(0xEAF1FF, 0xBFB29C, 1.9));
+  const key = new THREE.DirectionalLight(0xFFF2E0, 2.1); key.position.set(4, 6, 3);
+  const rim = new THREE.DirectionalLight(0xCFE0F5, 0.8); rim.position.set(-4, 2, -3);
+  sc.add(key, rim);
+  const cam = new THREE.PerspectiveCamera(28, 1, 0.05, 80);
+  const box = new THREE.Box3(), c = new THREE.Vector3(), sz = new THREE.Vector3();
+
+  for (const [id, def] of Object.entries(CATALOG)){
+    let obj;
+    try { obj = def.make({ len: def.len || 2.0, door: undefined, x:0, y:0, rot:0, z:0 }); }
+    catch (e){ console.warn('thumbnail failed for', id, e.message); continue; }
+    sc.add(obj);
+    box.setFromObject(obj); box.getCenter(c); box.getSize(sz);
+    const radius = Math.max(0.25, sz.length() / 2);
+    const dist = radius / Math.sin((cam.fov * Math.PI/180) / 2) * 1.06;
+    cam.position.set(c.x + dist*0.62, c.y + dist*0.52, c.z + dist*0.62);
+    cam.lookAt(c);
+    cam.updateProjectionMatrix();
+    r.render(sc, cam);
+    try { THUMBS[id] = r.domElement.toDataURL('image/png'); } catch {}
+    sc.remove(obj); disposeGroup(obj);
+  }
+  r.dispose();
+  buildPalette($('palSearch').value);
+}
+
+function buildPalette(filter = ''){
+  const q = filter.trim().toLowerCase();
   const groups = {};
-  for (const [id, def] of Object.entries(CATALOG))
+  for (const [id, def] of Object.entries(CATALOG)){
+    if (q && !(def.name.toLowerCase().includes(q) ||
+               def.cat.toLowerCase().includes(q) ||
+               id.includes(q))) continue;
     (groups[def.cat] = groups[def.cat] || []).push([id, def]);
+  }
   elPal.innerHTML = '';
-  for (const [cat, list] of Object.entries(groups)){
+  const cats = Object.keys(groups);
+  if (!cats.length){
+    const n = document.createElement('div');
+    n.className = 'grp'; n.textContent = 'nothing matches';
+    elPal.appendChild(n); return;
+  }
+  for (const cat of cats){
     const h = document.createElement('div'); h.className = 'grp'; h.textContent = cat;
     elPal.appendChild(h);
-    for (const [id, def] of list){
+    const grid = document.createElement('div'); grid.className = 'tiles';
+    for (const [id, def] of groups[cat]){
       const b = document.createElement('button');
-      b.className = 'it'; b.textContent = def.name;
+      b.className = 'it'; b.title = def.name;
+      if (THUMBS[id]){
+        const img = document.createElement('img');
+        img.src = THUMBS[id]; img.alt = ''; img.draggable = false;
+        b.appendChild(img);
+      } else {
+        const ph = document.createElement('span'); ph.className = 'ph'; b.appendChild(ph);
+      }
+      const cap = document.createElement('span');
+      cap.className = 'cap'; cap.textContent = def.name;
+      b.appendChild(cap);
       b.onclick = () => addItem(id);
-      elPal.appendChild(b);
+      grid.appendChild(b);
     }
+    elPal.appendChild(grid);
   }
 }
+$('palSearch').addEventListener('input', e => buildPalette(e.target.value));
+$('palSearch').placeholder = `Search ${Object.keys(CATALOG).length} pieces…`;
 function setEditing(on){
   editing = on && MODE !== 'walk';
+  if (editing) makeThumbnails();       // first open pays for the palette renders
   elEdit.classList.toggle('on', editing);
   bEdit.classList.toggle('on', editing);
   G_BADGE.visible = editing;
@@ -2516,13 +3447,60 @@ $('eReset').onclick  = () => resetLayout();
    is the camera orbiting or the plan panning, and must not change what is
    selected; a press that starts on a gizmo handle is the gizmo's business. */
 let topDragBlocked = false;
-let downAt = null;
+let downAt = null, marquee = null;
+const elMarq = $('marquee');
+
+/** Everything whose centre falls inside a screen-space rectangle. Projecting
+    the centre (rather than the whole box) keeps this identical in the plan and
+    in the perspective orbit view. */
+function pickInRect(a, b){
+  const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x);
+  const y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+  const v = new THREE.Vector3(), cam = CAMS[MODE];
+  const hits = [];
+  for (const it of LAYOUT){
+    v.set(it.x, it.z + 0.3, it.y).project(cam);
+    const sx = (v.x*0.5 + 0.5) * innerWidth, sy = (-v.y*0.5 + 0.5) * innerHeight;
+    if (sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1) hits.push(it.id);
+  }
+  return hits;
+}
+function drawMarquee(a, b){
+  elMarq.style.display = 'block';
+  elMarq.style.left   = Math.min(a.x, b.x) + 'px';
+  elMarq.style.top    = Math.min(a.y, b.y) + 'px';
+  elMarq.style.width  = Math.abs(b.x - a.x) + 'px';
+  elMarq.style.height = Math.abs(b.y - a.y) + 'px';
+}
+
 renderer.domElement.addEventListener('pointerdown', e => {
   if (!editing || e.button !== 0) return;
-  downAt = (gizmo.axis || gizmo.dragging) ? null : { x:e.clientX, y:e.clientY };
+  if (gizmo.axis || gizmo.dragging){ downAt = null; return; }
+  downAt = { x:e.clientX, y:e.clientY, shift:e.shiftKey };
+  if (e.shiftKey){                       // shift-drag sweeps a selection box
+    marquee = { ...downAt };
+    topDragBlocked = true;
+    orbit.enabled = false;
+    drawMarquee(marquee, downAt);
+  }
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  if (marquee) drawMarquee(marquee, { x:e.clientX, y:e.clientY });
 });
 renderer.domElement.addEventListener('pointerup', e => {
-  if (!editing || e.button !== 0 || !downAt) return;
+  if (!editing || e.button !== 0) return;
+  if (marquee){
+    const end = { x:e.clientX, y:e.clientY };
+    elMarq.style.display = 'none';
+    topDragBlocked = false;
+    orbit.enabled = (MODE === 'orbit');
+    const swept = Math.hypot(end.x - marquee.x, end.y - marquee.y);
+    if (swept > 6) selectMany(pickInRect(marquee, end), true);
+    else { const id = pickAt(end.x, end.y); if (id) select(id, true); }
+    marquee = null; downAt = null;
+    return;
+  }
+  if (!downAt) return;
   const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
   downAt = null;
   if (moved > 5 || gizmo.dragging) return;
@@ -2530,8 +3508,7 @@ renderer.domElement.addEventListener('pointerup', e => {
 });
 
 addEventListener('keydown', e => {
-  const typing = /^(INPUT|TEXTAREA)$/.test((e.target||{}).tagName || '');
-  if (typing) return;
+  if (isTyping(e)) return;
   if (e.code === 'KeyE' && !e.ctrlKey && !e.metaKey){
     if (MODE === 'walk') setMode('orbit');
     setEditing(!editing); return;
@@ -2540,6 +3517,12 @@ addEventListener('keydown', e => {
   if (e.code === 'Escape') select(null);
   if (e.code === 'Delete' || e.code === 'Backspace'){ deleteSelected(); e.preventDefault(); }
   if ((e.ctrlKey || e.metaKey) && e.code === 'KeyD'){ duplicateSelected(); e.preventDefault(); }
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA'){
+    selectMany(LAYOUT.map(o => o.id)); e.preventDefault();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyC'){ copySelected();  e.preventDefault(); }
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyX'){ cutSelected();   e.preventDefault(); }
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyV'){ pasteClipboard(); e.preventDefault(); }
   if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ'){
     e.shiftKey ? redo() : undo(); e.preventDefault();
   }
@@ -2552,7 +3535,7 @@ layoutListeners.push(() => {
   elClash.textContent = n
     ? `${n} piece${n>1?'s':''} fouling the shell`
     : `${LAYOUT.length} pieces · all clear`;
-  if (selectedId) renderProps();
+  if (selection.size) renderProps();
 });
 
 buildPalette();
@@ -2755,7 +3738,7 @@ $('pubGo').onclick = publishLayout;
 try { elPubN.value = localStorage.getItem(GALLERY.NAME_KEY) || ''; } catch {}
 
 addEventListener('keydown', e => {
-  if (/^(INPUT|TEXTAREA)$/.test((e.target||{}).tagName || '')) return;
+  if (isTyping(e)) return;
   if (e.code === 'KeyG' && !e.ctrlKey && !e.metaKey) setGallery(!galOpen);
 });
 
