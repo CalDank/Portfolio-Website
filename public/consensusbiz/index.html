@@ -149,6 +149,47 @@
   #clashes.ok{color:#5FA372}
   #clashes.bad{color:#E2564B}
 
+  /* ---- shared gallery drawer ---- */
+  #gal{position:fixed;top:70px;left:14px;bottom:64px;width:300px;z-index:41;
+    display:none;flex-direction:column;gap:8px;
+    background:rgba(20,24,31,.90);backdrop-filter:blur(12px);
+    border:1px solid var(--line);border-radius:10px;padding:10px}
+  #gal.on{display:flex}
+  #gal h3{margin:0;font:700 10px/1 "Inter",system-ui,sans-serif;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--brass)}
+  #galTabs{display:flex;gap:6px}
+  #galTabs button{flex:1;appearance:none;border:1px solid var(--line);border-radius:6px;
+    padding:6px 8px;cursor:pointer;background:rgba(255,255,255,.05);color:#CFCABF;
+    font:600 10px/1.2 "Inter",system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase}
+  #galTabs button.on{background:var(--brass);color:#1B1206;border-color:var(--brass)}
+  #galList{overflow-y:auto;flex:1 1 auto;margin:0 -4px;padding:0 4px;min-height:60px}
+  .card{border:1px solid var(--line);border-radius:7px;padding:7px 8px;margin-bottom:6px;
+    background:rgba(255,255,255,.03)}
+  .card .t{font:600 12px/1.3 "Inter",system-ui,sans-serif;color:#E8E4DC;
+    overflow-wrap:anywhere}
+  .card .m{font:500 10px/1.5 ui-monospace,monospace;color:#7E796F;margin:2px 0 6px;
+    overflow-wrap:anywhere}
+  .card .r{display:flex;gap:6px}
+  .card button{appearance:none;border:1px solid var(--line);border-radius:5px;
+    padding:4px 9px;cursor:pointer;background:rgba(255,255,255,.05);color:#CFCABF;
+    font:600 10px/1.2 "Inter",system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase}
+  .card button:hover{background:rgba(255,255,255,.13);color:#fff}
+  .card button.like{flex:0 0 auto}
+  .card button.like.done{background:rgba(176,141,87,.25);border-color:var(--brass);color:var(--brass)}
+  .card.here{border-color:var(--brass)}
+  #galMsg{font:500 10px/1.5 "Inter",system-ui,sans-serif;color:#7E796F}
+  #galMsg.err{color:#E2564B}
+
+  /* ---- publish form, inside the editor drawer ---- */
+  #pub{border-top:1px solid var(--line);padding-top:8px;display:flex;
+    flex-direction:column;gap:5px}
+  #pub input{background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:4px;
+    color:#E8E4DC;padding:5px 7px;font:500 11px/1.2 "Inter",system-ui,sans-serif;width:100%}
+  #pubGo{background:var(--brass)!important;color:#1B1206!important;border-color:var(--brass)!important}
+  #pubMsg{font:500 10px/1.4 "Inter",system-ui,sans-serif;color:#7E796F}
+  #pubMsg.err{color:#E2564B}
+  #pubMsg.ok{color:#5FA372}
+
   /* ---- webgl failure ---- */
   #fail{position:fixed;inset:0;z-index:90;display:none;place-items:center;
     background:#0E1116;padding:40px;text-align:center}
@@ -166,6 +207,17 @@
   <button id="b2"><b>2</b>Top</button>
   <button id="b3"><b>3</b>Orbit</button>
   <button id="bEdit"><b>E</b>Edit</button>
+  <button id="bGal"><b>G</b>Gallery</button>
+</div>
+
+<div id="gal">
+  <h3>Shared layouts</h3>
+  <div id="galTabs">
+    <button id="galNew" class="on">Recent</button>
+    <button id="galTop">Popular</button>
+  </div>
+  <div id="galMsg">&nbsp;</div>
+  <div id="galList"></div>
 </div>
 
 <div id="edit">
@@ -183,6 +235,12 @@
   <div id="props"><div class="none">Nothing selected &mdash; click a piece.</div></div>
   <h3>Add a piece</h3>
   <div id="palette"></div>
+  <div id="pub">
+    <input id="pubTitle" maxlength="60" placeholder="Give this layout a title">
+    <input id="pubName"  maxlength="32" placeholder="Your name (optional)">
+    <button id="pubGo">Save changes to the gallery</button>
+    <div id="pubMsg">Publishes so other visitors can open it.</div>
+  </div>
   <div class="row">
     <button id="eExport">Export</button>
     <button id="eImport">Import</button>
@@ -2501,6 +2559,205 @@ buildPalette();
 setGizmoMode('translate');
 refreshHistoryButtons();
 editorReady = true;
+
+/* ==========================================================================
+   8c. SHARED GALLERY
+   --------------------------------------------------------------------------
+   Publish a layout, browse what other people have published, and like the
+   ones worth keeping. Backed by an API Gateway HTTP API in front of a Lambda
+   and a DynamoDB table.
+
+   Two rules hold everywhere below:
+     · every string that came from another visitor is written with
+       textContent, never innerHTML. The server strips control characters and
+       caps length, but neither of those is XSS defence — this is.
+     · the gallery is optional. If the API is unreachable — offline, or the
+       page opened from file:// where CORS blocks it — say so plainly and
+       leave local editing working.
+   ========================================================================== */
+
+const GALLERY = {
+  API: 'https://s5iimbc4rl.execute-api.us-east-1.amazonaws.com',
+  LIKED_KEY: 'consensusbiz.liked.v1',
+  NAME_KEY : 'consensusbiz.name.v1',
+};
+
+const elGal  = $('gal'),  elGalList = $('galList'), elGalMsg = $('galMsg');
+const bGal   = $('bGal'), bGalNew   = $('galNew'),  bGalTop  = $('galTop');
+const elPubT = $('pubTitle'), elPubN = $('pubName'), elPubMsg = $('pubMsg');
+let galSort = 'new', galOpen = false, loadedId = null;
+
+const readSet = k => { try { return new Set(JSON.parse(localStorage.getItem(k) || '[]')); }
+                       catch { return new Set(); } };
+const writeSet = (k, s) => { try { localStorage.setItem(k, JSON.stringify([...s])); } catch {} };
+let likedIds = readSet(GALLERY.LIKED_KEY);
+
+async function api(path, opts = {}){
+  const r = await fetch(GALLERY.API + path, {
+    ...opts,
+    headers: opts.body ? { 'content-type':'application/json' } : undefined,
+  });
+  let data = null;
+  try { data = await r.json(); } catch {}
+  if (!r.ok) throw new Error((data && data.error) || `Request failed (${r.status})`);
+  return data;
+}
+/** file:// has a null origin, which the API's CORS list cannot include. */
+const isLocalFile = location.protocol === 'file:';
+function galMessage(text, isErr){
+  elGalMsg.textContent = text;
+  elGalMsg.className = isErr ? 'err' : '';
+}
+
+function galCard(it){
+  const card = document.createElement('div');
+  card.className = 'card' + (it.id === loadedId ? ' here' : '');
+
+  const t = document.createElement('div');
+  t.className = 't';
+  t.textContent = it.title || 'Untitled layout';        // never innerHTML
+  card.appendChild(t);
+
+  const m = document.createElement('div');
+  m.className = 'm';
+  const when = (() => { try { return new Date(it.createdAt).toLocaleDateString(); }
+                        catch { return ''; } })();
+  m.textContent = [it.author ? 'by ' + it.author : null,
+                   it.n + ' pieces',
+                   it.likes + (it.likes === 1 ? ' like' : ' likes'),
+                   when].filter(Boolean).join(' · ');
+  card.appendChild(m);
+
+  const row = document.createElement('div'); row.className = 'r';
+  const open = document.createElement('button');
+  open.textContent = it.id === loadedId ? 'Loaded' : 'Open';
+  open.disabled = it.id === loadedId;
+  open.onclick = () => openLayout(it.id);
+  row.appendChild(open);
+
+  const like = document.createElement('button');
+  const done = likedIds.has(it.id);
+  like.className = 'like' + (done ? ' done' : '');
+  like.textContent = done ? '♥ ' + it.likes : '♡ ' + it.likes;
+  like.disabled = done;
+  like.onclick = () => likeLayout(it.id, like);
+  row.appendChild(like);
+
+  card.appendChild(row);
+  return card;
+}
+
+async function loadGallery(sort = galSort){
+  galSort = sort;
+  bGalNew.classList.toggle('on', sort === 'new');
+  bGalTop.classList.toggle('on', sort === 'top');
+  elGalList.innerHTML = '';
+  if (isLocalFile){
+    galMessage('The gallery needs the hosted page — a file opened from disk ' +
+               'has no origin the API will accept. Editing and local saving still work.', true);
+    return;
+  }
+  galMessage('Loading…');
+  try {
+    const r = await api(`/list?sort=${sort}&limit=24`);
+    elGalList.innerHTML = '';
+    if (!r.items.length){
+      galMessage(sort === 'top' ? 'Nothing has been liked yet.'
+                                : 'Nothing published yet — be the first.');
+      return;
+    }
+    galMessage(`${r.items.length} layout${r.items.length > 1 ? 's' : ''}`);
+    for (const it of r.items) elGalList.appendChild(galCard(it));
+  } catch (e){
+    galMessage('Could not reach the gallery: ' + e.message, true);
+  }
+}
+
+async function openLayout(id){
+  galMessage('Opening…');
+  try {
+    const r = await api(`/layout/${encodeURIComponent(id)}`);
+    const items = (r.items || []).map(normaliseItem).filter(Boolean);
+    if (!items.length) throw new Error('that layout has nothing in it');
+    pushHistory();                       // so Ctrl+Z gets you back
+    LAYOUT = items;
+    loadedId = id;
+    select(null); renderLayout(); saveLocal();
+    if (MODE === 'walk') setMode('orbit');
+    galMessage('Opened. Ctrl+Z puts your own layout back.');
+    loadGallery(galSort);
+  } catch (e){
+    galMessage('Could not open that layout: ' + e.message, true);
+  }
+}
+
+async function likeLayout(id, btn){
+  btn.disabled = true;
+  try {
+    const r = await api(`/like/${encodeURIComponent(id)}`, { method:'POST', body:'{}' });
+    likedIds.add(id); writeSet(GALLERY.LIKED_KEY, likedIds);
+    btn.className = 'like done';
+    btn.textContent = '♥ ' + r.likes;
+  } catch (e){
+    // an already-liked 409 is not an error worth shouting about
+    if (/already/i.test(e.message)){
+      likedIds.add(id); writeSet(GALLERY.LIKED_KEY, likedIds);
+      btn.className = 'like done';
+    } else {
+      btn.disabled = false;
+      galMessage('Could not register that like: ' + e.message, true);
+    }
+  }
+}
+
+async function publishLayout(){
+  const title = elPubT.value.trim();
+  const author = elPubN.value.trim();
+  if (isLocalFile){
+    elPubMsg.className = 'err';
+    elPubMsg.textContent = 'Publishing needs the hosted page, not a file opened from disk.';
+    return;
+  }
+  if (!title){
+    elPubMsg.className = 'err';
+    elPubMsg.textContent = 'Give it a title first.';
+    elPubT.focus(); return;
+  }
+  const btn = $('pubGo');
+  btn.disabled = true;
+  elPubMsg.className = ''; elPubMsg.textContent = 'Publishing…';
+  try {
+    const r = await api('/publish', { method:'POST',
+      body: JSON.stringify({ title, author,
+        items: LAYOUT.map(({ type, x, y, rot, z }) => ({ type, x, y, rot, z })) }) });
+    try { localStorage.setItem(GALLERY.NAME_KEY, author); } catch {}
+    loadedId = r.id;
+    elPubMsg.className = 'ok';
+    elPubMsg.textContent = 'Published. It is in the gallery now.';
+    if (!galOpen) setGallery(true);
+    loadGallery('new');
+  } catch (e){
+    elPubMsg.className = 'err';
+    elPubMsg.textContent = e.message;
+  } finally { btn.disabled = false; }
+}
+
+function setGallery(on){
+  galOpen = on;
+  elGal.classList.toggle('on', on);
+  bGal.classList.toggle('on', on);
+  if (on) loadGallery(galSort);
+}
+bGal.onclick    = () => setGallery(!galOpen);
+bGalNew.onclick = () => loadGallery('new');
+bGalTop.onclick = () => loadGallery('top');
+$('pubGo').onclick = publishLayout;
+try { elPubN.value = localStorage.getItem(GALLERY.NAME_KEY) || ''; } catch {}
+
+addEventListener('keydown', e => {
+  if (/^(INPUT|TEXTAREA)$/.test((e.target||{}).tagName || '')) return;
+  if (e.code === 'KeyG' && !e.ctrlKey && !e.metaKey) setGallery(!galOpen);
+});
 
 /* ==========================================================================
    9. MAIN — verification, then the render loop.
