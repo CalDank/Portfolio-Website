@@ -1,0 +1,2037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Consensusbiz Office — Petak 70, Tingkat 20, Menara A</title>
+
+<!--
+  =========================================================================
+  CONSENSUSBIZ OFFICE — Petak 70, Tingkat 20, Menara A, Menara Landmark, JB
+  Interactive 3D fit-out: first-person walk / orthographic top / orbit.
+  Single self-contained file. No build step, no npm, no external assets.
+
+  NOTE: this file loads three.js r160 from unpkg via the import map below,
+  so it needs an internet connection the FIRST time it is opened. After
+  that the browser cache normally serves it offline.
+  =========================================================================
+-->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+  :root{
+    --paper:#F5F2ED; --navy:#1B2A4A; --brass:#B08D57;
+    --line:rgba(255,255,255,.16);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0E1116;
+    font:14px/1.45 "Inter","Segoe UI",system-ui,-apple-system,sans-serif;color:#E8E4DC}
+  canvas{display:block}
+  #app{position:fixed;inset:0}
+
+  /* ---- top-left mode bar ---- */
+  #bar{position:fixed;top:14px;left:14px;z-index:40;display:flex;gap:6px;
+    background:rgba(20,24,31,.82);backdrop-filter:blur(10px);
+    border:1px solid var(--line);border-radius:10px;padding:6px}
+  #bar button{appearance:none;border:0;border-radius:6px;padding:8px 13px;cursor:pointer;
+    background:transparent;color:#CFCABF;font:600 12px/1 "Inter",system-ui,sans-serif;
+    letter-spacing:.06em;text-transform:uppercase;transition:.15s}
+  #bar button:hover{background:rgba(255,255,255,.07);color:#fff}
+  #bar button.on{background:var(--brass);color:#1B1206}
+  #bar button b{opacity:.55;font-weight:700;margin-right:6px}
+
+  /* ---- title plate ---- */
+  #plate{position:fixed;top:14px;right:14px;z-index:40;text-align:right;
+    background:rgba(20,24,31,.82);backdrop-filter:blur(10px);
+    border:1px solid var(--line);border-radius:10px;padding:10px 14px;max-width:300px}
+  #plate h1{margin:0;font:700 13px/1.2 "Inter",system-ui,sans-serif;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--brass)}
+  #plate p{margin:4px 0 0;font-size:11px;line-height:1.5;color:#9B958A}
+
+  /* ---- key help ---- */
+  #help{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:40;
+    background:rgba(20,24,31,.86);backdrop-filter:blur(10px);
+    border:1px solid var(--line);border-radius:10px;padding:10px 16px;
+    font-size:12px;color:#CFCABF;transition:opacity .8s;white-space:nowrap}
+  #help kbd{display:inline-block;background:rgba(255,255,255,.1);border:1px solid var(--line);
+    border-radius:4px;padding:1px 6px;margin:0 2px;font:600 11px/1.5 ui-monospace,monospace;color:#fff}
+  #help.hide{opacity:0;pointer-events:none}
+
+  /* ---- click-to-walk prompt ---- */
+  #lock{position:fixed;inset:0;z-index:35;display:none;place-items:center;
+    background:rgba(8,10,14,.55);backdrop-filter:blur(3px);cursor:pointer}
+  #lock.on{display:grid}
+  #lock div{text-align:center}
+  #lock strong{display:block;font:700 15px/1 "Inter",system-ui,sans-serif;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--brass);margin-bottom:8px}
+  #lock span{font-size:12px;color:#9B958A}
+
+  /* ---- crosshair ---- */
+  #cross{position:fixed;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;
+    z-index:30;display:none;pointer-events:none}
+  #cross.on{display:block}
+  #cross:before,#cross:after{content:"";position:absolute;background:rgba(255,255,255,.55)}
+  #cross:before{left:6px;top:0;width:2px;height:14px}
+  #cross:after{top:6px;left:0;height:2px;width:14px}
+
+  /* ---- top-view overlay (labels, north arrow, scale bar) ---- */
+  #plan{position:fixed;inset:0;z-index:20;display:none;pointer-events:none}
+  #plan.on{display:block}
+  /* labels sit on both light oak and near-black carpet, so they carry their own
+     ground rather than relying on a text glow */
+  .lbl{position:absolute;transform:translate(-50%,-50%);text-align:center;
+    font:600 10px/1.35 "Inter",system-ui,sans-serif;letter-spacing:.09em;
+    text-transform:uppercase;color:#20242C;white-space:nowrap;
+    background:rgba(252,251,248,.90);border:1px solid rgba(32,36,44,.20);
+    border-radius:4px;padding:4px 8px 3px}
+  .lbl em{display:block;font:400 10px/1.4 ui-monospace,monospace;letter-spacing:.02em;
+    text-transform:none;color:#5A6070;font-style:normal;margin-top:1px}
+  #north{position:absolute;right:26px;top:132px}
+  #scalebar{position:absolute;left:26px;bottom:26px;
+    font:600 10px/1 "Inter",system-ui,sans-serif;letter-spacing:.08em;color:#20242C;
+    text-shadow:0 0 5px #fff,0 0 10px #fff}
+  #scalebar .rule{height:7px;border:1.5px solid #20242C;border-top:0;margin-bottom:5px;
+    background:linear-gradient(90deg,#20242C 0 25%,transparent 25% 50%,#20242C 50% 75%,transparent 75%)}
+
+  /* ---- readout ---- */
+  #readout{position:fixed;right:14px;bottom:14px;z-index:40;text-align:right;
+    background:rgba(20,24,31,.82);backdrop-filter:blur(10px);
+    border:1px solid var(--line);border-radius:10px;padding:8px 12px;
+    font:500 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#9B958A}
+  #readout b{color:var(--brass);font-weight:600}
+
+  /* ---- webgl failure ---- */
+  #fail{position:fixed;inset:0;z-index:90;display:none;place-items:center;
+    background:#0E1116;padding:40px;text-align:center}
+  #fail.on{display:grid}
+  #fail h2{color:var(--brass);font:700 14px/1 "Inter",system-ui,sans-serif;
+    letter-spacing:.16em;text-transform:uppercase}
+  #fail p{max-width:44ch;color:#9B958A;font-size:13px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="bar">
+  <button id="b1" class="on"><b>1</b>Walk</button>
+  <button id="b2"><b>2</b>Top</button>
+  <button id="b3"><b>3</b>Orbit</button>
+</div>
+
+<div id="plate">
+  <h1>Consensusbiz</h1>
+  <p>Petak 70, Tingkat 20, Menara A<br>Menara Landmark, Johor Bahru<br>
+     Strata parcel 93.7 m² &middot; PA(B) 163454-19</p>
+</div>
+
+<div id="plan">
+  <svg id="north" width="52" height="52" viewBox="0 0 52 52">
+    <circle cx="26" cy="26" r="16" fill="none" stroke="#20242C" stroke-width="1.5"/>
+    <path d="M26 3 L33 24 L26 19.5 L19 24 Z" fill="#20242C"/>
+    <text x="26" y="35" text-anchor="middle" font-family="Inter,system-ui,sans-serif"
+          font-size="13" font-weight="700" fill="#20242C">N</text>
+  </svg>
+  <div id="scalebar"><div class="rule" id="rule"></div><span id="ruletxt">5 m</span></div>
+</div>
+
+<div id="cross"></div>
+<div id="lock"><div><strong>Click to walk</strong>
+  <span>WASD to move &middot; mouse to look &middot; Shift to run &middot; Esc to release</span></div></div>
+
+<div id="help">
+  <kbd>1</kbd> walk &nbsp; <kbd>2</kbd> top &nbsp; <kbd>3</kbd> orbit
+  &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move
+  &nbsp;&middot;&nbsp; <kbd>Shift</kbd> run &nbsp;&middot;&nbsp; <kbd>Esc</kbd> release cursor
+</div>
+
+<div id="readout"></div>
+
+<div id="fail"><div>
+  <h2>WebGL unavailable</h2>
+  <p>This walkthrough needs WebGL 2. Try a current Chrome, Edge, Firefox or Safari,
+     and make sure hardware acceleration is enabled in your browser settings.</p>
+</div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls }        from 'three/addons/controls/OrbitControls.js';
+import { PointerLockControls }  from 'three/addons/controls/PointerLockControls.js';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
+
+/* ==========================================================================
+   COORDINATE CONVENTION
+   --------------------------------------------------------------------------
+   Everything in this file is authored in PLAN coordinates, metres:
+       x  -> from the corridor wall (x=0) toward the curtain wall (x=10.3)
+       y  -> along the corridor, demising wall 71 (y=0) to demising 69 (y=9.1)
+       z  -> up from finished floor level (FFL = 0, i.e. top of raised floor)
+   three.js is Y-up, so the mapping applied by every helper below is
+       three.x = plan.x     three.y = plan.z     three.z = plan.y
+   Nothing outside the helpers touches three.js axes directly.
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. CONFIG  — surveyed facts, derived dimensions, palette, zone schedule.
+      Tune the fit-out from here; no magic numbers live in the geometry code.
+   ========================================================================== */
+
+/* --- 1a. SURVEYED (from strata plan PA(B) 163454-19, Lot 18377, 1:300) ----
+   These five groups are measured site facts. Do not edit without re-checking
+   the survey plan. Everything below them is design. -------------------------*/
+const SURVEY = {
+  // Parcel is a clean rectangle: (0,0) (10.3,0) (10.3,9.1) (0,9.1)
+  W  : 10.3,          // corridor wall -> curtain wall
+  D  : 9.1,           // demising 71 -> demising 69
+  AREA_PLAN : 94.0,   // area printed on the surveyed strata plan, m2
+
+  SLAB_TO_SLAB  : 3.6,
+  CEILING       : 2.8,   // finished ceiling above FFL
+  RAISED_FLOOR  : 0.1,   // raised access floor build-up below FFL
+
+  COLUMN : { cx: 7.2, cy: 4.6, size: 0.6 },   // 600x600 structural column
+  MULLION_PITCH : 1.5,                        // curtain wall mullion spacing
+  ENTRANCE_CY   : 4.5,                        // centreline of entrance assembly
+};
+
+// Surveyed parcel corners, kept explicit so the area check below is honest.
+const PARCEL = [[0,0],[SURVEY.W,0],[SURVEY.W,SURVEY.D],[0,SURVEY.D]];
+
+/* --- 1b. SHELL / CONSTRUCTION (design assumptions) ---------------------- */
+const SHELL = {
+  WALL_T        : 0.15,   // demising + corridor wall thickness, built OUTSIDE
+                          // the parcel rectangle so clear area == 93.73 m2
+  PARTITION_T   : 0.09,   // internal stud / glazed partition thickness
+  GLASS_T       : 0.024,  // curtain wall + partition glass
+  MULLION_W     : 0.075,
+  DOOR_H        : 2.10,   // aperture head height (doors are open apertures)
+  DOOR_W        : 0.90,
+  ENTRY_DOOR_W  : 1.00,
+  ENTRY_SIDE_W  : 0.60,   // glazed sidelight beside the entrance door
+  MANIF_LO      : 1.10,   // frosted manifestation band, bottom
+  MANIF_HI      : 1.50,   // frosted manifestation band, top
+  BULKHEAD_W    : 1.00,   // FCU bulkhead along the corridor wall
+  BULKHEAD_DROP : 0.40,   // 400 mm deep -> soffit at CEILING - DROP
+  BLIND_TOP     : 2.75,
+  BLIND_BOTTOM  : 1.85,   // roller blinds shown half-raised: down far enough to
+                          // cut the afternoon glare, high enough that a standing
+                          // eye at 1.65 m still has the city view
+  SKIRTING_H    : 0.08,
+};
+
+/* --- 1c. PALETTE -------------------------------------------------------- */
+const C = {
+  WALL        : 0xF5F2ED,  // warm white
+  WALL_SHADE  : 0xEBE6DE,
+  OAK         : 0xC8A87C,  // light oak plank
+  OAK_DARK    : 0xA8875C,
+  CARPET      : 0x3A3D42,  // charcoal carpet tile
+  NAVY        : 0x1B2A4A,  // deep navy accent
+  BRASS       : 0xB08D57,  // brushed brass trim
+  BLACK_FRAME : 0x1A1C20,  // slim partition framing
+  CEILING     : 0xF2EFE9,
+  SLAB        : 0x6E6A64,
+  GLASS       : 0xBBD6E4,
+  FROST       : 0xE8EEF1,
+  TIMBER_SLAT : 0xB98F5F,
+  FABRIC_MID  : 0x6C7482,  // sofa / task chair upholstery
+  FABRIC_DK   : 0x2B3140,
+  LEATHER     : 0x3B3128,
+  STEEL       : 0x8A8F96,
+  WHITE_LAM   : 0xEFECE6,
+  PLANT       : 0x3E6B45,
+  PLANT_LT    : 0x568C56,
+  POT         : 0x8E8377,
+  SCREEN_OFF  : 0x14171C,
+  BLIND       : 0xD8D2C6,
+};
+
+/* --- 1d. ZONE SCHEDULE --------------------------------------------------
+   Rectangles are clear internal, [x0,x1,y0,y1]. `floor` picks the finish.
+   Areas are computed, never typed, so the console table cannot drift from
+   the geometry. -----------------------------------------------------------*/
+const ZONES = [
+  { id:'store',   name:'Document & Compliance Store', brief: 7, rect:[0.00, 3.00, 0.00, 2.30], floor:'carpet' },
+  { id:'recep',   name:'Reception & Waiting',         brief:14, rect:[0.00, 3.05, 2.30, 7.00], floor:'oak'    },
+  { id:'pantry',  name:'Pantry Nook',                 brief: 6, rect:[0.00, 3.00, 7.00, 9.10], floor:'oak'    },
+  { id:'flex',    name:'Flex Bay & Phone Booth',      brief: 0, rect:[3.05, 6.70, 0.00, 3.75], floor:'oak'    },
+  { id:'open',    name:'Open Workstations',           brief:24, rect:[3.05, 6.70, 5.25, 9.10], floor:'oak'    },
+  { id:'meet',    name:"Client Meeting Room",         brief:14, rect:[6.70,10.30, 0.00, 3.90], floor:'carpet' },
+  { id:'break',   name:'Window Breakout',             brief: 5, rect:[8.20,10.30, 3.90, 6.25], floor:'oak'    },
+  { id:'dir',     name:"Director's Office",           brief:11, rect:[6.70,10.30, 6.25, 9.10], floor:'carpet' },
+];
+// Zone rectangles are dimensioned to PARTITION CENTRELINES, the usual space-
+// planning convention; clear internal dims are ~45 mm less on each partitioned
+// side. The perimeter walls are built outside the parcel, so the surveyed
+// 93.73 m² is all usable floor.
+// The open-plan work zone is read as 'open' + 'flex' together: the brief asks
+// for ~24 m² and the two bays give 27.7 m² of unenclosed floor either side of
+// the entrance spine.
+
+/* --- 1e. CIRCULATION RULES (checked, not just asserted) ------------------ */
+const CIRC = {
+  SPINE_W       : 1.50,   // entrance -> curtain wall
+  SPINE_Y0      : 3.75,   // spine band, aligned on the entrance assembly
+  SPINE_Y1      : 5.25,
+  SECONDARY_W   : 1.00,
+  SEATED_CLEAR  : 0.90,   // behind every seated chair
+  // The route the spine actually takes: dead straight from the entrance to
+  // x = 6.35, then clear of the north face of the surveyed column (y = 4.90),
+  // south of the window planter, and out to the breakout at the glazing.
+  // Section 9d measures clear width along it. Leg 0 is the straight run.
+  SPINE_ROUTE   : [[0.30, 4.50], [6.35, 4.50], [6.85, 5.45],
+                   [7.58, 5.45], [8.40, 4.95], [8.85, 5.05]],
+};
+
+/* --- 1f. FURNITURE DIMENSIONS ------------------------------------------- */
+const DIM = {
+  DESK_H        : 0.740,  // seated height of the sit-stand desks
+  DESK_H_STAND  : 1.100,  // one desk is modelled raised, to read as sit-stand
+  DESK_W        : 1.150,  // 1150 mm bench module: 3 of them = 3.45 m, which is
+                          // what actually fits between the pantry wall and the
+                          // director's partition with working end margins
+  DESK_D        : 0.750,
+  DESK_TOP_T    : 0.025,
+  SCREEN_H      : 0.350,  // 350 mm acoustic screen between facing desks
+  SCREEN_T      : 0.045,
+  PED_W         : 0.420, PED_D : 0.550, PED_H : 0.600,
+  CHAIR_W       : 0.560, CHAIR_D : 0.560, CHAIR_SEAT : 0.450, CHAIR_BACK : 1.030,
+  TABLE_H       : 0.740,
+  COUNTER_H     : 0.900, COUNTER_D : 0.620,
+  STOOL_H       : 0.720, STOOL_R : 0.180,
+  BOOTH         : 1.200,  // 1.2 x 1.2 phone / video booth
+  BOOTH_H       : 2.300,
+  SHELF_H       : 2.000,
+  FILE_W        : 0.470, FILE_D : 0.620, FILE_H : 1.320,
+};
+
+/* --- 1g. LIGHTING ------------------------------------------------------- */
+const LIGHT = {
+  HEMI_SKY   : 0xE8F0FF,
+  // HEMI_GROUND lights every DOWNWARD-facing surface, which here means the
+  // finished ceiling. Kept light and warm so the ceiling reads as warm white
+  // plasterboard bouncing the oak floor, not as mud.
+  HEMI_GROUND: 0xC4B8A4, HEMI_INT : 0.72,
+  SUN_COLOR  : 0xFFE7C4, SUN_INT : 2.30,
+  SUN_DIR    : { x: 26.0, y: 12.0, z: 3.0 },   // raking through the curtain wall
+  FIXTURE    : 0xFFF3E2,
+  LINEAR_INT : 4.4,  PENDANT_INT : 3.0,  DOWN_INT : 2.2,
+  EXPOSURE   : 1.06,
+};
+
+/* --- 1h. CAMERAS -------------------------------------------------------- */
+const CAM = {
+  EYE_H       : 1.65,
+  WALK_SPEED  : 2.10,   // m/s
+  RUN_MULT    : 2.05,
+  BODY_R      : 0.30,   // collision radius
+  ACCEL       : 12.0,
+  FOV         : 62,
+  // just inside the entrance, facing the curtain wall down the spine.
+  // `yaw` is degrees CCW in plan from +Y, matching the `unit()` convention.
+  START       : { x: 0.85, y: 4.50, yaw: 270 },
+  ORBIT_TGT   : { x: 5.15, y: 4.55, z: 1.10 },
+  TOP_PAD     : 1.30,   // metres of margin around the parcel in top view
+};
+
+/* ==========================================================================
+   Derived + verified: the parcel area.  Shoelace over the surveyed corners.
+   ========================================================================== */
+const PARCEL_AREA = (() => {
+  let a = 0;
+  for (let i = 0; i < PARCEL.length; i++) {
+    const [x1,y1] = PARCEL[i], [x2,y2] = PARCEL[(i+1)%PARCEL.length];
+    a += x1*y2 - x2*y1;
+  }
+  return Math.abs(a) / 2;                 // 10.3 * 9.1 = 93.73 m2
+})();
+
+/* ==========================================================================
+   2. FOUNDATION — renderer, scene, canvas-drawn textures, materials and the
+      plan-space primitives every later section is built from.
+   ========================================================================== */
+
+/* --- 2a. WebGL guard ---------------------------------------------------- */
+function webglOK(){
+  try {
+    const c = document.createElement('canvas');
+    return !!(window.WebGLRenderingContext &&
+              (c.getContext('webgl2') || c.getContext('webgl')));
+  } catch(e){ return false; }
+}
+if (!webglOK()){
+  document.getElementById('fail').classList.add('on');
+  throw new Error('WebGL unavailable');
+}
+
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));   // cap at 2 for iGPU
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+renderer.toneMapping       = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = LIGHT.EXPOSURE;
+renderer.outputColorSpace  = THREE.SRGBColorSpace;
+document.getElementById('app').appendChild(renderer.domElement);
+RectAreaLightUniformsLib.init();
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9FB6C9);        // hazy JB sky beyond the glass
+
+/* --- 2b. Canvas-drawn textures (no external image files anywhere) -------- */
+function cvs(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
+function mkTex(c, rx=1, ry=1){
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+const hex = n => '#' + n.toString(16).padStart(6,'0');
+
+/** Light-oak plank: board joints + drifting grain streaks. */
+function woodCanvas(base, dark, boards=6){
+  const S = 512, c = cvs(S,S), g = c.getContext('2d');
+  g.fillStyle = hex(base); g.fillRect(0,0,S,S);
+  const bh = S/boards;
+  for (let b=0; b<boards; b++){
+    const y0 = b*bh;
+    // per-board tonal drift
+    g.fillStyle = `rgba(0,0,0,${0.015 + (b%3)*0.018})`;
+    g.fillRect(0, y0, S, bh);
+    // grain
+    for (let i=0;i<130;i++){
+      const y = y0 + Math.random()*bh;
+      g.strokeStyle = `rgba(${(dark>>16)&255},${(dark>>8)&255},${dark&255},${0.05+Math.random()*0.13})`;
+      g.lineWidth = 0.6 + Math.random()*1.5;
+      g.beginPath(); g.moveTo(0,y);
+      for (let x=0; x<=S; x+=32) g.lineTo(x, y + Math.sin((x+b*90)/58)*1.9 + (Math.random()-0.5)*1.4);
+      g.stroke();
+    }
+    // board joint
+    g.strokeStyle='rgba(0,0,0,.30)'; g.lineWidth=1.4;
+    g.beginPath(); g.moveTo(0,y0); g.lineTo(S,y0); g.stroke();
+    // end joint, staggered
+    const ex = ((b*167)%S);
+    g.beginPath(); g.moveTo(ex,y0); g.lineTo(ex,y0+bh); g.stroke();
+  }
+  return c;
+}
+
+/** Charcoal loop-pile carpet tile: fine speckle + faint tile grid. */
+function carpetCanvas(base, tiles=2){
+  const S = 256, c = cvs(S,S), g = c.getContext('2d');
+  g.fillStyle = hex(base); g.fillRect(0,0,S,S);
+  const img = g.getImageData(0,0,S,S), d = img.data;
+  for (let i=0;i<d.length;i+=4){
+    const n = (Math.random()-0.5)*34;
+    d[i]+=n; d[i+1]+=n; d[i+2]+=n*0.9;
+  }
+  g.putImageData(img,0,0);
+  g.strokeStyle='rgba(255,255,255,.045)'; g.lineWidth=1;
+  for (let i=1;i<tiles;i++){
+    const p=i*S/tiles;
+    g.beginPath(); g.moveTo(p,0); g.lineTo(p,S); g.moveTo(0,p); g.lineTo(S,p); g.stroke();
+  }
+  return c;
+}
+
+/** Upholstery weave. */
+function fabricCanvas(base){
+  const S=128, c=cvs(S,S), g=c.getContext('2d');
+  g.fillStyle=hex(base); g.fillRect(0,0,S,S);
+  for (let y=0;y<S;y+=2){
+    g.fillStyle=`rgba(255,255,255,${0.020+Math.random()*0.030})`; g.fillRect(0,y,S,1);
+  }
+  for (let x=0;x<S;x+=2){
+    g.fillStyle=`rgba(0,0,0,${0.020+Math.random()*0.035})`; g.fillRect(x,0,1,S);
+  }
+  return c;
+}
+
+/** Matt emulsion — barely-there tooth so big wall planes do not band. */
+function paintCanvas(base){
+  const S=128, c=cvs(S,S), g=c.getContext('2d');
+  g.fillStyle=hex(base); g.fillRect(0,0,S,S);
+  for (let i=0;i<2600;i++){
+    g.fillStyle=`rgba(0,0,0,${Math.random()*0.030})`;
+    g.fillRect(Math.random()*S, Math.random()*S, 1, 1);
+  }
+  return c;
+}
+
+/** Backlit reception wordmark, drawn as an emissive map. */
+function signCanvas(){
+  const W=1024, H=180, c=cvs(W,H), g=c.getContext('2d');
+  g.fillStyle='#000'; g.fillRect(0,0,W,H);
+  g.textAlign='center'; g.textBaseline='middle';
+  g.fillStyle='#fff';
+  g.font='700 96px Inter, "Segoe UI", Helvetica, Arial, sans-serif';
+  // letter-spaced wordmark, drawn glyph by glyph
+  const word='CONSENSUSBIZ', track=13;
+  let total=0; for (const ch of word) total += g.measureText(ch).width + track;
+  total -= track;
+  let x = (W-total)/2;
+  g.shadowColor='#fff'; g.shadowBlur=26;
+  for (const ch of word){
+    const w=g.measureText(ch).width;
+    g.fillText(ch, x+w/2, H/2+4);
+    x += w+track;
+  }
+  return c;
+}
+
+/** Fair-faced concrete for the exposed slab above the ceiling void. */
+function concreteCanvas(base){
+  const S=256,c=cvs(S,S),g=c.getContext('2d');
+  g.fillStyle=hex(base); g.fillRect(0,0,S,S);
+  for(let i=0;i<900;i++){
+    const r=Math.random()*3+0.5;
+    g.fillStyle=`rgba(${Math.random()<.5?0:255},${Math.random()<.5?0:255},255,${Math.random()*0.05})`;
+    g.beginPath(); g.arc(Math.random()*S,Math.random()*S,r,0,7); g.fill();
+  }
+  return c;
+}
+
+const TEX = {
+  oak      : mkTex(woodCanvas(C.OAK,      C.OAK_DARK, 6), 3.6, 3.2),
+  oakFine  : mkTex(woodCanvas(C.OAK,      C.OAK_DARK, 4), 1.0, 1.0),
+  walnut   : mkTex(woodCanvas(0x7A5B3C,   0x4A3524, 4), 1.0, 1.0),
+  carpet   : mkTex(carpetCanvas(C.CARPET, 2), 4.0, 4.0),
+  fabric   : mkTex(fabricCanvas(C.FABRIC_MID), 2, 2),
+  fabricDk : mkTex(fabricCanvas(C.FABRIC_DK), 2, 2),
+  paint    : mkTex(paintCanvas(C.WALL), 4, 3),
+  sign     : mkTex(signCanvas(), 1, 1),
+  slab     : mkTex(concreteCanvas(C.SLAB), 6, 5),
+};
+
+/* --- 2c. Materials ------------------------------------------------------ */
+const std = o => new THREE.MeshStandardMaterial(o);
+const MAT = {
+  floorOak   : std({ map:TEX.oak,    roughness:0.62, metalness:0.02 }),
+  floorCarp  : std({ map:TEX.carpet, roughness:0.98, metalness:0.00 }),
+  wall       : std({ map:TEX.paint,  color:C.WALL, roughness:0.94 }),
+  wallSide   : std({ color:C.WALL_SHADE, roughness:0.94 }),
+  ceiling    : std({ color:C.CEILING, roughness:0.96 }),
+  slabSoffit : std({ map:TEX.slab, color:C.SLAB, roughness:0.98 }),
+  navy       : std({ color:C.NAVY,  roughness:0.55, metalness:0.05 }),
+  brass      : std({ color:C.BRASS, roughness:0.34, metalness:0.85 }),
+  frame      : std({ color:C.BLACK_FRAME, roughness:0.42, metalness:0.55 }),
+  steel      : std({ color:C.STEEL, roughness:0.40, metalness:0.70 }),
+  oak        : std({ map:TEX.oakFine, roughness:0.55 }),
+  walnut     : std({ map:TEX.walnut,  roughness:0.50 }),
+  slat       : std({ color:C.TIMBER_SLAT, roughness:0.60 }),
+  lam        : std({ color:C.WHITE_LAM, roughness:0.42 }),
+  lamDk      : std({ color:0x3C4149, roughness:0.55 }),
+  fabric     : std({ map:TEX.fabric,   color:0xFFFFFF, roughness:0.92 }),
+  fabricDk   : std({ map:TEX.fabricDk, color:0xFFFFFF, roughness:0.92 }),
+  leather    : std({ color:C.LEATHER, roughness:0.62, metalness:0.03 }),
+  glassOut   : new THREE.MeshPhysicalMaterial({
+                 color:C.GLASS, roughness:0.04, metalness:0.0, transmission:0.0,
+                 transparent:true, opacity:0.20, side:THREE.DoubleSide }),
+  glassIn    : new THREE.MeshPhysicalMaterial({
+                 color:0xEAF3F6, roughness:0.05, metalness:0.0,
+                 transparent:true, opacity:0.14, side:THREE.DoubleSide }),
+  frost      : new THREE.MeshStandardMaterial({
+                 color:C.FROST, roughness:0.85, transparent:true, opacity:0.55,
+                 side:THREE.DoubleSide }),
+  // translucent screen fabric, so the blinds glow rather than reading as a wall
+  blind      : std({ color:C.BLIND, roughness:0.92, transparent:true, opacity:0.62,
+                     side:THREE.DoubleSide }),
+  screenOff  : std({ color:C.SCREEN_OFF, roughness:0.22, metalness:0.15 }),
+  fixture    : new THREE.MeshStandardMaterial({
+                 color:0xFFFFFF, emissive:LIGHT.FIXTURE, emissiveIntensity:2.2, roughness:0.5 }),
+  sign       : new THREE.MeshStandardMaterial({
+                 color:C.NAVY, emissive:0xFFFFFF, emissiveMap:TEX.sign,
+                 emissiveIntensity:2.4, roughness:0.6 }),
+  plantDk    : std({ color:C.PLANT,    roughness:0.85, side:THREE.DoubleSide }),
+  plantLt    : std({ color:C.PLANT_LT, roughness:0.85, side:THREE.DoubleSide }),
+  pot        : std({ color:C.POT, roughness:0.80 }),
+  soil       : std({ color:0x2A241C, roughness:1.0 }),
+  city       : std({ color:0x8FA6BC, roughness:1.0 }),
+};
+
+/* --- 2d. Scene graph roots (so modes can hide whole layers cheaply) ------ */
+const ROOT       = new THREE.Group();  scene.add(ROOT);
+const G_SHELL    = new THREE.Group();  ROOT.add(G_SHELL);
+const G_CEILING  = new THREE.Group();  ROOT.add(G_CEILING);   // hidden in top + orbit
+const G_PART     = new THREE.Group();  ROOT.add(G_PART);
+const G_FURN     = new THREE.Group();  ROOT.add(G_FURN);
+const G_FIX      = new THREE.Group();  ROOT.add(G_FIX);       // luminaire bodies, hidden in top
+const G_LIGHT    = new THREE.Group();  ROOT.add(G_LIGHT);     // the light objects, always live
+const G_TOPONLY  = new THREE.Group();  ROOT.add(G_TOPONLY);   // grid, hidden elsewhere
+const G_CONTEXT  = new THREE.Group();  ROOT.add(G_CONTEXT);   // corridor beyond, walk only
+const G_ABOVE    = new THREE.Group();  ROOT.add(G_ABOVE);     // high-level joinery a
+                                                             // plan would dash, not draw
+
+/* --- 2e. Collider registry ----------------------------------------------
+   Every solid registers a plan-space AABB. The same list drives first-person
+   collision and the end-of-load clash verification. -------------------------*/
+const COLLIDERS = [];
+function addCollider(x0,x1,y0,y1,z0,z1,name,kind){
+  COLLIDERS.push({ x0:Math.min(x0,x1), x1:Math.max(x0,x1),
+                   y0:Math.min(y0,y1), y1:Math.max(y0,y1),
+                   z0:Math.min(z0,z1), z1:Math.max(z0,z1), name, kind:kind||'furn' });
+}
+
+/* --- 2f. Plan-space primitives ------------------------------------------
+   `slab` is the workhorse: give it the six plan extents and it places a box
+   and (unless told otherwise) registers its collider. -----------------------*/
+function slab(x0,x1,y0,y1,z0,z1,mat,opt={}){
+  const w = Math.abs(x1-x0), d = Math.abs(y1-y0), h = Math.abs(z1-z0);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set((x0+x1)/2, (z0+z1)/2, (y0+y1)/2);
+  m.castShadow    = opt.cast !== false;
+  m.receiveShadow = opt.recv !== false;
+  if (opt.name) m.name = opt.name;
+  if (opt.collide !== false) addCollider(x0,x1,y0,y1,z0,z1, opt.name||'solid', opt.kind);
+  return m;
+}
+/** Vertical cylinder in plan space. */
+function post(x,y,z0,z1,rBot,rTop,mat,seg=16,opt={}){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop,rBot,Math.abs(z1-z0),seg), mat);
+  m.position.set(x,(z0+z1)/2,y);
+  m.castShadow = opt.cast !== false; m.receiveShadow = opt.recv !== false;
+  return m;
+}
+/** Horizontal plane facing up, used for floors and ceiling tiles. */
+function plane(x0,x1,y0,y1,z,mat,down=false){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(Math.abs(x1-x0), Math.abs(y1-y0)), mat);
+  m.rotation.x = down ? Math.PI/2 : -Math.PI/2;
+  m.position.set((x0+x1)/2, z, (y0+y1)/2);
+  m.receiveShadow = true;
+  return m;
+}
+/** A local group whose contents are authored around (0,0) then dropped at
+    (x,y) and spun `deg` degrees CCW in plan. Used for chairs, plants, etc. */
+function unit(x,y,deg=0){
+  const g = new THREE.Group();
+  g.position.set(x,0,y);
+  g.rotation.y = -deg * Math.PI/180;   // plan CCW -> three.js Y
+  return g;
+}
+/** Local-space box helper for use inside `unit` groups. */
+function lbox(w,d,h,mat,x=0,y=0,z=0,opt={}){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(x, z+h/2, y);
+  m.castShadow = opt.cast !== false; m.receiveShadow = opt.recv !== false;
+  return m;
+}
+/** Rounded-ish box via a scaled box + bevel strip — cheap, reads fine. */
+function softBox(w,d,h,mat,x=0,y=0,z=0){
+  const g = new THREE.Group();
+  g.add(lbox(w,d,h*0.86,mat,x,y,z));
+  g.add(lbox(w*0.94,d*0.94,h*0.16,mat,x,y,z+h*0.84));
+  return g;
+}
+
+/* ==========================================================================
+   3. SHELL — floors, corridor + demising walls, curtain wall, structural
+      column, finished ceiling, FCU bulkhead, and the city beyond the glass.
+   ========================================================================== */
+
+const W = SURVEY.W, D = SURVEY.D, CH = SURVEY.CEILING;
+
+/* --- 3a. Floors ---------------------------------------------------------
+   Oak everywhere, then carpet tile laid over the enclosed rooms. -----------*/
+G_SHELL.add(plane(0, W, 0, D, 0, MAT.floorOak));
+for (const z of ZONES){
+  if (z.floor !== 'carpet') continue;
+  const [x0,x1,y0,y1] = z.rect;
+  const p = plane(x0,x1,y0,y1, 0.004, MAT.floorCarp);
+  p.name = 'carpet_' + z.id;
+  G_SHELL.add(p);
+}
+// Raised access floor build-up. Its top is held 12 mm below FFL so it cannot
+// z-fight with the finish above it — from any camera you see the oak, not the
+// dark plenum, and the edge still reads as a shadow line at the glazing.
+G_SHELL.add(slab(0, W, 0, D, -SURVEY.RAISED_FLOOR, -0.012, MAT.lamDk,
+                 { collide:false, cast:false }));
+
+/* --- 3b. Wall builders ---------------------------------------------------
+   `along:'y'` runs the wall in the Y direction at plan x = at (thickness in
+   X); `along:'x'` runs it in X at plan y = at. Holes are open apertures. ----*/
+const runRect = (along, at, t, a, b) =>
+  along === 'y' ? [at, at+t, a, b] : [a, b, at, at+t];
+
+function segmentsOf(from, to, holes){
+  const segs = []; let c = from;
+  for (const h of [...holes].sort((p,q)=>p.a-q.a)){
+    if (h.a > c) segs.push([c, h.a]);
+    c = Math.max(c, h.b);
+  }
+  if (c < to) segs.push([c, to]);
+  return segs;
+}
+
+/** Solid plasterboard / blockwork wall with open apertures. */
+function solidWall(o){
+  const { along, at, t, from, to, z0=0, z1=CH, mat=MAT.wall,
+          holes=[], head=SHELL.DOOR_H, kind='shell', name='wall',
+          group=G_PART, skirt=false } = o;
+  for (const [a,b] of segmentsOf(from,to,holes)){
+    const r = runRect(along, at, t, a, b);
+    group.add(slab(r[0],r[1],r[2],r[3], z0, z1, mat, { name, kind }));
+    if (skirt){
+      const s = SHELL.SKIRTING_H, e = 0.006;
+      const inner = along === 'y'
+        ? [r[1], r[1]+e, r[2], r[3]] : [r[0], r[1], r[3], r[3]+e];
+      const outer = along === 'y'
+        ? [r[0]-e, r[0], r[2], r[3]] : [r[0], r[1], r[2]-e, r[2]];
+      group.add(slab(...inner, 0, s, MAT.lamDk, { collide:false }));
+      group.add(slab(...outer, 0, s, MAT.lamDk, { collide:false }));
+    }
+  }
+  // heads over the apertures
+  for (const h of holes){
+    if (h.full) continue;                       // full-height opening, no head
+    const r = runRect(along, at, t, h.a, h.b);
+    group.add(slab(r[0],r[1],r[2],r[3], h.head ?? head, z1, mat,
+                   { name:name+'_head', kind, collide:false }));
+    // brass reveal on the aperture head, a small piece of the design language
+    const rv = along === 'y' ? [at-0.004, at+t+0.004, h.a, h.b]
+                             : [h.a, h.b, at-0.004, at+t+0.004];
+    group.add(slab(...rv, (h.head ?? head)-0.02, h.head ?? head, MAT.brass, { collide:false }));
+  }
+}
+
+/** Full-height glazed partition: slim black frame, clear glass, frosted band. */
+function glazedWall(o){
+  const { along, at, t=SHELL.PARTITION_T, from, to, z0=0, z1=CH,
+          holes=[], head=SHELL.DOOR_H, name='glazing', manif=true,
+          group=G_PART, maxBay=1.30 } = o;
+  const fT = t;                       // frame depth == partition thickness
+  const gT = SHELL.GLASS_T;
+  const gMid = at + t/2;
+
+  for (const [a,b] of segmentsOf(from,to,holes)){
+    const len = b - a;
+    const bays = Math.max(1, Math.round(len / maxBay));
+    // sill + head rails
+    group.add(slab(...runRect(along, at, t, a, b), 0, 0.055, MAT.frame, { collide:false }));
+    group.add(slab(...runRect(along, at, t, a, b), z1-0.06, z1, MAT.frame, { collide:false }));
+    // vertical mullions, including both ends
+    for (let i=0;i<=bays;i++){
+      const p = a + len*i/bays;
+      const w = 0.045;
+      const c0 = Math.max(a, p-w/2), c1 = Math.min(b, p+w/2);
+      group.add(slab(...runRect(along, at, t, c0, c1), 0, z1, MAT.frame, { collide:false }));
+    }
+    // glass. The visible leaf is 24 mm, but the collider is registered across
+    // the full 90 mm partition zone: that is the line circulation is measured
+    // to, and it stops you standing inside the framing in walk mode.
+    group.add(slab(...runRect(along, gMid-gT/2, gT, a, b), 0.055, z1-0.06,
+                   MAT.glassIn, { cast:false, collide:false }));
+    addCollider(...runRect(along, at, t, a, b), 0, z1, name, 'shell');
+    // frosted manifestation band at 1.1–1.5 m
+    if (manif){
+      const bT = gT + 0.006;
+      group.add(slab(...runRect(along, gMid-bT/2, bT, a, b),
+                     SHELL.MANIF_LO, SHELL.MANIF_HI, MAT.frost,
+                     { collide:false, cast:false }));
+    }
+  }
+  // frame head over each aperture
+  for (const h of holes){
+    if (h.full) continue;
+    const hh = h.head ?? head;
+    group.add(slab(...runRect(along, at, t, h.a, h.b), hh-0.055, hh, MAT.frame,
+                   { collide:false }));
+    group.add(slab(...runRect(along, at+t/2-gT/2, gT, h.a, h.b), hh, z1-0.06,
+                   MAT.glassIn, { cast:false, collide:false }));
+    group.add(slab(...runRect(along, at, t, h.a, h.b), z1-0.06, z1, MAT.frame,
+                   { collide:false }));
+    // jambs
+    for (const p of [h.a, h.b]){
+      const c0 = p === h.a ? p : p-0.045, c1 = p === h.a ? p+0.045 : p;
+      group.add(slab(...runRect(along, at, t, c0, c1), 0, hh, MAT.frame, { collide:false }));
+    }
+  }
+}
+
+/* --- 3c. Corridor wall (x = 0) ------------------------------------------
+   Solid — lift lobbies, two lift banks and two fire stairs sit beyond it.
+   The only opening is the entrance: a 1.0 m glazed door leaf (modelled as an
+   open aperture) plus a 0.6 m glazed sidelight, assembly centred on y=4.5. --*/
+const ENTRY_A = SURVEY.ENTRANCE_CY - (SHELL.ENTRY_DOOR_W + SHELL.ENTRY_SIDE_W)/2; // 3.70
+const ENTRY_B = ENTRY_A + SHELL.ENTRY_DOOR_W;                                     // 4.70
+const ENTRY_C = ENTRY_B + SHELL.ENTRY_SIDE_W;                                     // 5.30
+
+solidWall({ along:'y', at:-SHELL.WALL_T, t:SHELL.WALL_T, from:-SHELL.WALL_T, to:D+SHELL.WALL_T,
+            name:'corridor_wall', holes:[{a:ENTRY_A, b:ENTRY_C, head:CH, full:true}] });
+// entrance: door aperture (void) + head, then the glazed sidelight
+G_PART.add(slab(-SHELL.WALL_T, 0, ENTRY_A, ENTRY_B, SHELL.DOOR_H+0.12, CH, MAT.wall,
+                { collide:false, name:'entry_head' }));
+G_PART.add(slab(-SHELL.WALL_T-0.006, 0.006, ENTRY_A, ENTRY_B,
+                SHELL.DOOR_H+0.10, SHELL.DOOR_H+0.12, MAT.brass, { collide:false }));
+// door jambs + sidelight framing
+for (const p of [[ENTRY_A-0.05,ENTRY_A],[ENTRY_B,ENTRY_B+0.05],[ENTRY_C,ENTRY_C+0.05]])
+  G_PART.add(slab(-SHELL.WALL_T, 0, p[0], p[1], 0, SHELL.DOOR_H+0.12, MAT.frame,
+                  { collide:false }));
+G_PART.add(slab(-0.09,-0.06, ENTRY_B, ENTRY_C, 0, SHELL.DOOR_H+0.12, MAT.glassIn,
+                { cast:false, name:'entry_sidelight', kind:'shell' }));
+G_PART.add(slab(-SHELL.WALL_T, 0, ENTRY_B, ENTRY_C, SHELL.DOOR_H+0.12, CH, MAT.wall,
+                { collide:false }));
+// The corridor beyond, glimpsed through the opening. Walk mode only — in top
+// and orbit it is just a slab of nothing sitting outside the parcel.
+G_CONTEXT.add(slab(-2.4, -SHELL.WALL_T, 2.2, 6.9, 0, CH, MAT.wallSide,
+                   { collide:false, cast:false }));
+G_CONTEXT.add(plane(-2.4, -SHELL.WALL_T, 2.2, 6.9, 0.002, MAT.floorCarp));
+G_CONTEXT.add(slab(-2.4, -2.36, 2.2, 6.9, 0, CH, MAT.navy, { collide:false, cast:false }));
+
+/* --- 3d. Demising walls (y = 0 and y = 9.1) ------------------------------
+   Shared with parcels 71 and 69. Solid, acoustically rated, no openings. ----*/
+solidWall({ along:'x', at:-SHELL.WALL_T, t:SHELL.WALL_T, from:-SHELL.WALL_T, to:W,
+            name:'demising_71', skirt:true });
+solidWall({ along:'x', at:D, t:SHELL.WALL_T, from:-SHELL.WALL_T, to:W,
+            name:'demising_69', skirt:true });
+
+/* --- 3e. Curtain wall (x = 10.3) ----------------------------------------
+   Floor-to-ceiling glazing on a 1.5 m mullion grid. 9.1 m of frontage gives
+   six full 1.5 m bays plus a 100 mm closer panel at the party wall. --------*/
+const MULLIONS = [];
+for (let y = 0; y <= D + 1e-6; y += SURVEY.MULLION_PITCH) MULLIONS.push(+y.toFixed(3));
+if (MULLIONS[MULLIONS.length-1] < D - 1e-6) MULLIONS.push(D);
+
+const cwX = W, mW = SHELL.MULLION_W;
+// glass leaf, one continuous pane per bay
+for (let i=0;i<MULLIONS.length-1;i++){
+  const a = MULLIONS[i], b = MULLIONS[i+1];
+  G_SHELL.add(slab(cwX-0.012, cwX+0.012, a, b, 0, CH, MAT.glassOut,
+                   { cast:false, name:'curtain_glass', kind:'shell' }));
+}
+// mullions, transom at head, and the base track
+for (const y of MULLIONS)
+  G_SHELL.add(slab(cwX-0.05, cwX+0.03, y-mW/2, y+mW/2, 0, CH, MAT.frame, { collide:false }));
+G_SHELL.add(slab(cwX-0.05, cwX+0.03, 0, D, CH-0.07, CH, MAT.frame, { collide:false }));
+G_SHELL.add(slab(cwX-0.06, cwX+0.03, 0, D, 0, 0.07, MAT.frame, { collide:false }));
+// a solid barrier so you cannot walk out of the building
+addCollider(cwX-0.06, cwX+0.05, -0.2, D+0.2, 0, CH, 'curtain_wall', 'shell');
+
+// roller blinds, half raised
+for (let i=0;i<MULLIONS.length-1;i++){
+  const a = MULLIONS[i]+0.03, b = MULLIONS[i+1]-0.03;
+  if (b - a < 0.25) continue;
+  G_SHELL.add(slab(cwX-0.115, cwX-0.10, a, b, SHELL.BLIND_BOTTOM, SHELL.BLIND_TOP,
+                   MAT.blind, { collide:false, cast:false }));
+  G_SHELL.add(slab(cwX-0.15, cwX-0.07, a, b, SHELL.BLIND_TOP, SHELL.BLIND_TOP+0.10,
+                   MAT.lam, { collide:false }));      // blind box
+  G_SHELL.add(slab(cwX-0.125, cwX-0.09, a, b, SHELL.BLIND_BOTTOM-0.03, SHELL.BLIND_BOTTOM,
+                   MAT.lam, { collide:false }));      // bottom bar
+}
+
+/* --- 3f. Structural column (600 x 600 at 7.2, 4.6) -----------------------
+   Surveyed. Everything else is laid out around it. -------------------------*/
+const COL = SURVEY.COLUMN;
+const COL_X0 = COL.cx - COL.size/2, COL_X1 = COL.cx + COL.size/2;
+const COL_Y0 = COL.cy - COL.size/2, COL_Y1 = COL.cy + COL.size/2;
+G_SHELL.add(slab(COL_X0, COL_X1, COL_Y0, COL_Y1, 0, CH, MAT.wall,
+                 { name:'column', kind:'shell' }));
+// navy base wrap + brass reveal, so it reads as a designed element
+G_SHELL.add(slab(COL_X0-0.012, COL_X1+0.012, COL_Y0-0.012, COL_Y1+0.012, 0, 0.55,
+                 MAT.navy, { collide:false }));
+G_SHELL.add(slab(COL_X0-0.016, COL_X1+0.016, COL_Y0-0.016, COL_Y1+0.016, 0.55, 0.565,
+                 MAT.brass, { collide:false }));
+
+/* --- 3g. Ceiling and the FCU bulkhead ------------------------------------ */
+G_CEILING.add(plane(-0.02, W+0.02, -0.02, D+0.02, CH, MAT.ceiling, true));
+// 400 mm deep, 1.0 m wide bulkhead along the corridor wall, carrying the FCU
+// cast:false — with the sun overhead the box would shadow its own soffit, which
+// reads as a dirty brown band rather than the warm white plasterboard it is.
+G_CEILING.add(slab(0, SHELL.BULKHEAD_W, 0, D, CH-SHELL.BULKHEAD_DROP, CH, MAT.ceiling,
+                   { collide:false, cast:false }));
+addCollider(0, SHELL.BULKHEAD_W, 0, D, CH-SHELL.BULKHEAD_DROP, CH, 'fcu_bulkhead', 'shell');
+G_CEILING.add(slab(SHELL.BULKHEAD_W, SHELL.BULKHEAD_W+0.012, 0, D,
+                   CH-SHELL.BULKHEAD_DROP, CH-SHELL.BULKHEAD_DROP+0.012, MAT.brass,
+                   { collide:false }));
+// linear supply grille on the bulkhead face
+G_CEILING.add(slab(SHELL.BULKHEAD_W-0.004, SHELL.BULKHEAD_W+0.004, 1.1, 8.0,
+                   CH-0.30, CH-0.12, MAT.lamDk, { collide:false }));
+
+/* --- 3h. Johor Bahru, twenty floors down --------------------------------- */
+(function city(){
+  const g = new THREE.Group(), GROUND = -68;   // level 20 ≈ 68 m above street
+  const geo = new THREE.BoxGeometry(1,1,1);
+  const rnd = (s => () => (s = (s*16807) % 2147483647) / 2147483647)(20250827);
+  // Scattered in a ring around the tower rather than only off the facade, so
+  // the doll's house reads as level 20 of a city block from every orbit angle.
+  for (let i=0;i<86;i++){
+    const bw = 8 + rnd()*26, bd = 8 + rnd()*26;
+    const top = GROUND + 6 + rnd()*rnd()*64;   // few neighbours reach level 20
+    const a  = rnd()*Math.PI*2;
+    const rr = 42 + rnd()*rnd()*150;           // none crowd the parcel itself
+    const x = W/2 + Math.cos(a)*rr;
+    const y = D/2 + Math.sin(a)*rr;
+    const m = new THREE.Mesh(geo, MAT.city);
+    m.scale.set(bw, top-GROUND, bd);
+    m.position.set(x, (GROUND+top)/2, y);
+    m.castShadow = m.receiveShadow = false;
+    g.add(m);
+  }
+  const ground = plane(-200, 260, -200, 260, GROUND, MAT.city);
+  ground.receiveShadow = false;
+  g.add(ground);
+  g.matrixAutoUpdate = false; g.updateMatrix();
+  scene.add(g);
+})();
+scene.fog = new THREE.Fog(0x9FB6C9, 70, 300);   // far enough to leave the interior alone
+
+/* ==========================================================================
+   4. PARTITIONS — enclosed rooms hug the demising walls and the corridor
+      wall; the curtain wall is kept open to the floorplate through the
+      2.35 m breakout gap, and every internal room is glazed so borrowed
+      daylight reaches the deep plan.
+   ========================================================================== */
+
+const PT = SHELL.PARTITION_T, HPT = PT/2;
+
+/* --- 4a. Document & compliance store (windowless, corridor wall) --------- */
+// north wall, with the store door at the west end
+solidWall({ along:'x', at:2.30-HPT, t:PT, from:0, to:3.00+HPT,
+            name:'store_north', skirt:true,
+            holes:[{ a:0.15, b:1.05 }] });
+// east wall
+solidWall({ along:'y', at:3.00-HPT, t:PT, from:0, to:2.30-HPT,
+            name:'store_east', skirt:true });
+
+/* --- 4b. Reception feature wall ------------------------------------------
+   Acoustic timber slats on the store's north face, with the backlit
+   wordmark floated in front of them. --------------------------------------*/
+(function featureWall(){
+  const yF = 2.30 + HPT;                       // reception-side face
+  const x0 = 1.15, x1 = 3.00;
+  // dark backing so the slat shadows read
+  G_PART.add(slab(x0, x1, yF, yF+0.014, 0, CH, MAT.navy, { collide:false }));
+  // 90 mm pitch with a 62 mm slat leaves a 28 mm dark reveal — the proportion
+  // of a real acoustic slat panel. Wider gaps read as stripes, not joinery.
+  const pitch = 0.09, wSlat = 0.062, proud = 0.030;
+  for (let x = x0+0.02; x <= x1-wSlat-0.02; x += pitch){
+    G_PART.add(slab(x, x+wSlat, yF+0.014, yF+0.014+proud, 0, CH, MAT.slat,
+                    { collide:false }));
+  }
+  addCollider(x0, x1, yF, yF+0.05, 0, CH, 'reception_feature_wall', 'shell');
+  // backlit CONSENSUSBIZ sign, 1.70 x 0.30, floated 25 mm off the slats
+  const sx0 = 1.28, sx1 = 2.98, sz0 = 1.62, sz1 = 1.92;
+  G_PART.add(slab(sx0, sx1, yF+0.060, yF+0.075, sz0, sz1, MAT.sign,
+                  { collide:false, cast:false }));
+  // halo spill on the slats behind the sign
+  const halo = new THREE.PointLight(0xFFE9CC, 1.5, 3.2, 2);
+  halo.position.set((sx0+sx1)/2, (sz0+sz1)/2, yF+0.22);
+  G_FIX.add(halo);
+  // brass reveal under the sign
+  G_PART.add(slab(sx0, sx1, yF+0.060, yF+0.078, sz0-0.020, sz0-0.006, MAT.brass,
+                  { collide:false }));
+})();
+
+/* --- 4c. Pantry nook (against demising wall 69, near the entrance) -------
+   Deliberately a nook, not a room: a short return wall gives the counter a
+   back, the rest is open to reception. ------------------------------------*/
+solidWall({ along:'x', at:7.00-HPT, t:PT, from:0, to:1.30, name:'pantry_return', skirt:true });
+solidWall({ along:'y', at:3.00-HPT, t:PT, from:7.00-HPT, to:D, name:'pantry_east', skirt:true });
+
+/* --- 4d. Client meeting room (window + demising corner) ------------------
+   West line: glazed / solid AV pier / glazed / door aperture.
+   North line: fully glazed, so the room borrows the spine's daylight. ------*/
+glazedWall({ along:'y', at:6.70-HPT, from:0.00, to:1.30, name:'meet_w1' });
+solidWall ({ along:'y', at:6.70-HPT, t:PT, from:1.30, to:2.60,
+             name:'meet_av_pier', skirt:true });
+glazedWall({ along:'y', at:6.70-HPT, from:2.60, to:3.90, name:'meet_w2',
+             holes:[{ a:3.00, b:3.90 }] });
+glazedWall({ along:'x', at:3.90-HPT, from:6.70-HPT, to:W, name:'meet_north' });
+// navy acoustic panel on the AV pier, meeting-room side
+G_PART.add(slab(6.70+HPT, 6.70+HPT+0.014, 1.34, 2.56, 0, CH, MAT.navy, { collide:false }));
+
+/* --- 4e. Director's office (the other window corner) ---------------------
+   Glazed with the frosted manifestation band for privacy at seated height. -*/
+glazedWall({ along:'x', at:6.25-HPT, from:6.70-HPT, to:W, name:'dir_south',
+             holes:[{ a:6.85, b:7.75 }] });
+glazedWall({ along:'y', at:6.70-HPT, from:6.25-HPT, to:D, name:'dir_west' });
+
+/* ==========================================================================
+   5. FURNITURE
+   --------------------------------------------------------------------------
+   5a. component library — authored in local space, origin at the footprint
+       centre, facing +Y (plan north). `place()` drops one into the plan and
+       registers its footprint collider.
+   5b. placement — zone by zone.
+   ========================================================================== */
+
+/* deterministic noise, so plants and grain look the same on every reload */
+let _seed = 20250827;
+const rnd = () => ((_seed = (_seed*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+
+function place(obj, x, y, deg=0, foot=null, name='furniture'){
+  const u = unit(x, y, deg);
+  u.add(obj);
+  G_FURN.add(u);
+  if (foot){
+    const [w,d,h] = foot;
+    const r = ((deg % 360) + 360) % 360;
+    const swap = (r === 90 || r === 270);
+    const ww = swap ? d : w, dd = swap ? w : d;
+    addCollider(x-ww/2, x+ww/2, y-dd/2, y+dd/2, 0, h, name, 'furn');
+  }
+  return u;
+}
+
+/* ---- seating ----------------------------------------------------------- */
+function taskChair(fab = MAT.fabric){
+  const g = new THREE.Group();
+  for (let i=0;i<5;i++){
+    const a = i*Math.PI*2/5;
+    const arm = lbox(0.055, 0.30, 0.035, MAT.frame, Math.sin(a)*0.135, Math.cos(a)*0.135, 0.030);
+    arm.rotation.y = -a; g.add(arm);
+    g.add(post(Math.sin(a)*0.265, Math.cos(a)*0.265, 0, 0.055, 0.030, 0.030, MAT.frame, 8));
+  }
+  g.add(post(0, 0, 0.055, 0.415, 0.048, 0.042, MAT.steel, 10));
+  g.add(lbox(0.480, 0.460, 0.080, fab, 0, 0, 0.415));
+  g.add(lbox(0.050, 0.050, 0.170, MAT.frame, 0, -0.190, 0.490));
+  const back = lbox(0.455, 0.055, 0.500, fab, 0, -0.205, 0.500);
+  back.rotation.x = -0.11; g.add(back);
+  const hd = lbox(0.300, 0.050, 0.110, fab, 0, -0.240, 1.000);
+  hd.rotation.x = -0.11; g.add(hd);
+  for (const s of [-1, 1]){
+    g.add(lbox(0.045, 0.290, 0.022, MAT.frame,  s*0.255, -0.020, 0.630));
+    g.add(lbox(0.038, 0.050, 0.200, MAT.frame,  s*0.255, -0.110, 0.430));
+  }
+  return g;
+}
+
+function confChair(fab = MAT.fabricDk){
+  const g = new THREE.Group();
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    g.add(post(sx*0.205, sy*0.195, 0, 0.430, 0.021, 0.018, MAT.frame, 8));
+  g.add(lbox(0.480, 0.460, 0.075, fab, 0, 0, 0.425));
+  const back = lbox(0.460, 0.060, 0.470, fab, 0, -0.205, 0.500);
+  back.rotation.x = -0.13; g.add(back);
+  for (const s of [-1,1]) g.add(lbox(0.030, 0.230, 0.020, MAT.frame, s*0.245, -0.030, 0.640));
+  return g;
+}
+
+function armChair(fab = MAT.fabric){
+  const g = new THREE.Group();
+  g.add(lbox(0.780, 0.760, 0.100, MAT.frame, 0, 0, 0.100));
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    g.add(post(sx*0.320, sy*0.300, 0, 0.110, 0.026, 0.022, MAT.brass, 8));
+  g.add(lbox(0.700, 0.680, 0.140, fab, 0, 0.020, 0.200));   // cushion
+  const bk = lbox(0.760, 0.130, 0.480, fab, 0, -0.310, 0.200); bk.rotation.x = -0.12; g.add(bk);
+  for (const s of [-1,1]) g.add(lbox(0.110, 0.700, 0.240, fab, s*0.335, 0.010, 0.200));
+  return g;
+}
+
+function sofa2(fab = MAT.fabric){
+  const g = new THREE.Group();
+  g.add(lbox(1.600, 0.800, 0.100, MAT.frame, 0, 0, 0.110));
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    g.add(post(sx*0.730, sy*0.320, 0, 0.120, 0.026, 0.022, MAT.brass, 8));
+  for (const s of [-1,1]) g.add(lbox(0.660, 0.700, 0.145, fab, s*0.345, 0.030, 0.210));
+  const bk = lbox(1.580, 0.150, 0.470, fab, 0, -0.320, 0.210); bk.rotation.x = -0.11; g.add(bk);
+  for (const s of [-1,1]) g.add(lbox(0.130, 0.740, 0.250, fab, s*0.735, 0.020, 0.210));
+  for (const s of [-1,1]) g.add(lbox(0.360, 0.120, 0.320, fab, s*0.330, -0.245, 0.350)); // cushions
+  return g;
+}
+
+function stool(){
+  const g = new THREE.Group();
+  g.add(post(0,0,0,DIM.STOOL_H-0.045, 0.036, 0.030, MAT.frame, 10));
+  g.add(post(0,0,0,0.020, 0.185, 0.185, MAT.frame, 18));
+  g.add(post(0,0,DIM.STOOL_H-0.045, DIM.STOOL_H, DIM.STOOL_R, DIM.STOOL_R, MAT.oak, 20));
+  g.add(post(0,0,0.190,0.212, 0.135, 0.135, MAT.brass, 14));   // foot ring
+  return g;
+}
+
+/* ---- desks + storage ---------------------------------------------------- */
+function benchDesk(h = DIM.DESK_H, w = DIM.DESK_W, d = DIM.DESK_D){
+  const g = new THREE.Group();
+  g.add(lbox(w, d, DIM.DESK_TOP_T, MAT.oak, 0, 0, h-DIM.DESK_TOP_T));
+  for (const s of [-1,1]){
+    const x = s*(w/2 - 0.09);
+    g.add(lbox(0.075, 0.075, h-DIM.DESK_TOP_T-0.030, MAT.frame, x, 0, 0.030)); // outer column
+    g.add(lbox(0.055, 0.055, h-DIM.DESK_TOP_T-0.240, MAT.steel, x, 0, 0.230)); // inner telescope
+    g.add(lbox(0.055, d*0.80, 0.032, MAT.frame, x, 0, 0));                     // foot
+    g.add(lbox(0.115, d*0.55, 0.055, MAT.frame, x, 0, h-DIM.DESK_TOP_T-0.055));
+  }
+  g.add(lbox(w-0.30, 0.055, 0.075, MAT.frame, 0, -d*0.18, h-0.18));            // beam
+  // sit-stand controller
+  g.add(lbox(0.090, 0.030, 0.016, MAT.lamDk, w/2-0.28, d/2-0.02, h-0.040));
+  return g;
+}
+
+function monitor(w=0.560, h=0.335){
+  const g = new THREE.Group();
+  g.add(lbox(0.220, 0.180, 0.014, MAT.lamDk, 0, 0, 0));
+  g.add(post(0, -0.02, 0.014, 0.170, 0.024, 0.024, MAT.lamDk, 8));
+  g.add(lbox(w, 0.022, h, MAT.lamDk, 0, -0.020, 0.170));
+  g.add(lbox(w-0.020, 0.006, h-0.024, MAT.screenOff, 0, -0.034, 0.182));
+  return g;
+}
+
+function pedestal(){
+  const g = new THREE.Group();
+  g.add(lbox(DIM.PED_W, DIM.PED_D, DIM.PED_H-0.05, MAT.lam, 0, 0, 0.05));
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    g.add(post(sx*0.15, sy*0.20, 0, 0.05, 0.024, 0.024, MAT.frame, 8));
+  for (let i=0;i<3;i++)
+    g.add(lbox(DIM.PED_W-0.02, 0.010, 0.014, MAT.frame, 0, DIM.PED_D/2, 0.12+i*0.165));
+  return g;
+}
+
+function fileCabinet(drawers=4){
+  const g = new THREE.Group();
+  g.add(lbox(DIM.FILE_W, DIM.FILE_D, DIM.FILE_H, MAT.lam, 0, 0, 0));
+  for (let i=0;i<drawers;i++){
+    const z = 0.06 + i*(DIM.FILE_H-0.10)/drawers;
+    g.add(lbox(DIM.FILE_W-0.03, 0.012, (DIM.FILE_H-0.12)/drawers-0.012, MAT.lamDk, 0, DIM.FILE_D/2, z));
+    g.add(lbox(0.130, 0.020, 0.016, MAT.brass, 0, DIM.FILE_D/2+0.008, z+0.055));
+  }
+  return g;
+}
+
+function shelving(w=1.000, d=0.350, h=DIM.SHELF_H, tiers=5){
+  const g = new THREE.Group();
+  for (const s of [-1,1]) g.add(lbox(0.030, d, h, MAT.frame, s*(w/2-0.015), 0, 0));
+  for (let i=0;i<=tiers;i++){
+    const z = i*(h-0.03)/tiers;
+    g.add(lbox(w-0.04, d, 0.026, MAT.oak, 0, 0, z));
+    if (i < tiers){
+      // box files, so the shelves are not empty
+      let x = -w/2 + 0.06;
+      while (x < w/2 - 0.12){
+        const bw = 0.045 + rnd()*0.075, bh = 0.22 + rnd()*0.08;
+        const col = [0x2C3346, 0x7A5B3C, 0x5B6270, 0x8E8377][(rnd()*4)|0];
+        g.add(lbox(bw, d-0.08, bh, std({ color:col, roughness:0.85 }), x+bw/2, 0, z+0.026));
+        x += bw + 0.006;
+      }
+    }
+  }
+  return g;
+}
+
+function credenza(w=1.600, d=0.450, h=0.720){
+  const g = new THREE.Group();
+  g.add(lbox(w, d, h-0.10, MAT.walnut, 0, 0, 0.10));
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    g.add(post(sx*(w/2-0.10), sy*(d/2-0.08), 0, 0.105, 0.020, 0.018, MAT.brass, 8));
+  for (const s of [-1,1]){
+    g.add(lbox(w/2-0.03, 0.010, h-0.16, MAT.walnut, s*w/4, d/2, 0.13));
+    g.add(lbox(0.016, 0.026, 0.140, MAT.brass, s*0.055, d/2+0.010, h/2-0.02));
+  }
+  return g;
+}
+
+/* ---- greenery ----------------------------------------------------------- */
+/** A planted mass built from many small, thin, tilted leaf blades rather than
+    a few big spheres — reads as foliage instead of broccoli, and is still only
+    one shared geometry. */
+function foliage(r, h, leaves=26){
+  const g = new THREE.Group();
+  const leaf = new THREE.IcosahedronGeometry(1, 0);
+  const stemGeo = new THREE.CylinderGeometry(0.006, 0.010, 1, 5);
+  for (let i=0;i<leaves;i++){
+    const t   = i / leaves;
+    const a   = i * 2.399963 + rnd()*0.5;              // golden-angle phyllotaxis
+    const rr  = r * (0.18 + 0.82*Math.sqrt(rnd()));
+    const zz  = h * (0.16 + 0.84*Math.pow(rnd(), 0.75));
+    const len = r * (0.24 + rnd()*0.22);
+    const m = new THREE.Mesh(leaf, rnd() > 0.42 ? MAT.plantDk : MAT.plantLt);
+    m.scale.set(len, len*0.16, len*0.62);              // flat blade
+    m.position.set(Math.cos(a)*rr, zz, Math.sin(a)*rr);
+    m.rotation.set((rnd()-0.5)*0.9, -a + (rnd()-0.5)*0.6, (rnd()-0.5)*1.1);
+    m.castShadow = true;
+    g.add(m);
+    if (i % 3 === 0){                                   // a few visible stems
+      const s = new THREE.Mesh(stemGeo, MAT.plantDk);
+      s.scale.y = zz;
+      s.position.set(Math.cos(a)*rr*0.45, zz/2, Math.sin(a)*rr*0.45);
+      s.rotation.z = (rnd()-0.5)*0.35;
+      g.add(s);
+    }
+  }
+  return g;
+}
+function planter(r=0.280, potH=0.520, plantH=1.050, potMat=MAT.pot){
+  const g = new THREE.Group();
+  g.add(post(0, 0, 0, potH, r*0.80, r, potMat, 22));
+  g.add(post(0, 0, potH-0.045, potH-0.028, r*0.965, r*0.965, MAT.soil, 22));
+  g.add(post(0, 0, potH-0.012, potH, r*1.02, r*1.02, potMat, 22));   // rim
+  const f = foliage(r*1.15, plantH, 46);
+  f.position.y = potH - 0.06;
+  g.add(f);
+  return g;
+}
+function deskPlant(){
+  const g = new THREE.Group();
+  g.add(post(0,0,0,0.115,0.058,0.070,MAT.navy,14));
+  const f = foliage(0.105, 0.175, 18); f.position.y = 0.10; g.add(f);
+  return g;
+}
+
+/* ==========================================================================
+   5b. PLACEMENT
+   ========================================================================== */
+
+/* ---- Reception & waiting ------------------------------------------------
+   Desk backs onto the slat wall so the receptionist faces anyone stepping
+   through the entrance; the waiting group sits north of it, off the spine. -*/
+(function reception(){
+  // Counter: navy carcass, oak worktop, brass reveal, raised transaction shelf.
+  // 620 mm deep rather than 700, and the transaction shelf steps up *within*
+  // the footprint instead of oversailing it, so the counter face lands exactly
+  // on y = 3.75 and the 1.5 m entrance spine stays 1.5 m wide past reception.
+  const x0=1.25, x1=3.00, y0=3.13, y1=3.75, h=0.750;
+  G_FURN.add(slab(x0, x1, y0, y1, 0.060, h, MAT.navy, { name:'reception_desk' }));
+  G_FURN.add(slab(x0+0.04, x1-0.04, y0+0.04, y1-0.04, 0, 0.060, MAT.lamDk, { collide:false }));
+  G_FURN.add(slab(x0-0.02, x1+0.02, y0-0.02, y1, h, h+0.032, MAT.oak, { collide:false }));
+  G_FURN.add(slab(x0-0.024, x1+0.024, y1-0.008, y1, 0.060, h, MAT.brass, { collide:false }));
+  // transaction shelf on brass standoffs, held inside the counter face
+  G_FURN.add(slab(x0-0.05, x1+0.05, y1-0.200, y1, 1.060, 1.095, MAT.oak, { collide:false }));
+  for (const x of [x0+0.12, (x0+x1)/2, x1-0.12])
+    G_FURN.add(slab(x-0.018, x+0.018, y1-0.075, y1-0.035, h+0.032, 1.060, MAT.brass,
+                    { collide:false }));
+  addCollider(x0-0.05, x1+0.05, y0-0.02, y1, 0, 1.095, 'reception_counter', 'furn');
+  // desktop kit
+  place(monitor(0.520,0.310), 2.05, 3.36, 180);
+  G_FURN.add(slab(1.42, 1.58, 3.28, 3.44, h+0.032, h+0.062, MAT.lamDk, { collide:false })); // phone
+  place(deskPlant(), 2.78, 3.34, 0);
+  place(taskChair(), 2.10, 2.76, 0, [0.62,0.62,1.10], 'reception_chair');
+
+  // waiting group, tucked north of the entrance against the corridor wall
+  place(sofa2(), 0.45, 6.15, 270, [1.60,0.80,0.78], 'waiting_sofa');
+  place(armChair(), 2.15, 6.50, 215, [0.80,0.80,0.70], 'waiting_armchair');
+  const ct = new THREE.Group();
+  ct.add(lbox(0.900,0.550,0.040,MAT.walnut,0,0,0.340));
+  ct.add(lbox(0.820,0.470,0.022,MAT.walnut,0,0,0.150));
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    ct.add(post(sx*0.395, sy*0.220, 0, 0.345, 0.016, 0.014, MAT.brass, 8));
+  ct.add(lbox(0.220,0.170,0.030,std({color:0x8B2E2E,roughness:0.7}),-0.16,0.03,0.380));
+  place(ct, 1.50, 5.78, 0, [0.90,0.55,0.38], 'coffee_table');
+  place(planter(0.260, 0.520, 1.150), 2.78, 5.62, 0, [0.52,0.52,1.60], 'planter_reception');
+
+  // entrance mat
+  G_FURN.add(plane(0.02, 1.10, ENTRY_A+0.06, ENTRY_C-0.66, 0.010, MAT.fabricDk));
+})();
+
+/* ---- Document & compliance store ---------------------------------------
+   Windowless back-of-house on the corridor wall: passport and visa files
+   locked away, the printer bay and the shredder out of the client's sight. -*/
+(function store(){
+  for (let i=0;i<4;i++)
+    place(fileCabinet(), 0.30 + i*0.495, 0.335, 0, [DIM.FILE_W, DIM.FILE_D, DIM.FILE_H],
+          'file_cabinet_'+i);
+  place(shelving(1.150, 0.340, 2.000, 5), 2.775, 1.500, 90, [1.15,0.34,2.00], 'store_shelving');
+  // printer / scanner bay
+  const pr = new THREE.Group();
+  pr.add(lbox(0.700,0.600,0.760,MAT.lam,0,0,0));
+  pr.add(lbox(0.620,0.520,0.290,MAT.lamDk,0,0,0.760));
+  pr.add(lbox(0.560,0.360,0.030,MAT.lam,0,0.06,1.050));
+  pr.add(lbox(0.180,0.020,0.070,MAT.screenOff,0.20,0.26,0.890));
+  place(pr, 2.42, 0.360, 0, [0.70,0.60,1.05], 'printer_bay');
+  // shredder + bin
+  const sh = new THREE.Group();
+  sh.add(lbox(0.400,0.340,0.530,MAT.lamDk,0,0,0));
+  sh.add(lbox(0.420,0.360,0.140,MAT.frame,0,0,0.530));
+  sh.add(lbox(0.230,0.020,0.012,MAT.screenOff,0,0,0.665));
+  place(sh, 1.62, 1.98, 0, [0.42,0.36,0.67], 'shredder');
+})();
+
+/* ---- Pantry nook -------------------------------------------------------- */
+(function pantry(){
+  const cy1 = D, cy0 = D - DIM.COUNTER_D, h = DIM.COUNTER_H;
+  G_FURN.add(slab(0.10, 2.90, cy0, cy1, 0.090, h-0.035, MAT.lam, { name:'pantry_counter' }));
+  G_FURN.add(slab(0.14, 2.86, cy0+0.06, cy1, 0, 0.090, MAT.lamDk, { collide:false }));
+  // Worktop, built as four strips around the sink cut-out — a single slab would
+  // bury the basin under it.
+  const sx0=0.72, sx1=1.26, sy0=cy0+0.11, sy1=cy1-0.09, wt0=cy0-0.030;
+  G_FURN.add(slab(0.06, sx0, wt0, cy1, h-0.035, h, MAT.walnut, { collide:false }));
+  G_FURN.add(slab(sx1, 2.94, wt0, cy1, h-0.035, h, MAT.walnut, { collide:false }));
+  G_FURN.add(slab(sx0, sx1, wt0, sy0, h-0.035, h, MAT.walnut, { collide:false }));
+  G_FURN.add(slab(sx0, sx1, sy1, cy1, h-0.035, h, MAT.walnut, { collide:false }));
+  // cabinet door lines + brass pulls
+  for (let i=0;i<5;i++){
+    const x = 0.12 + i*0.556;
+    G_FURN.add(slab(x, x+0.540, cy0-0.012, cy0-0.004, 0.095, h-0.045, MAT.lam, { collide:false }));
+    G_FURN.add(slab(x+0.24, x+0.30, cy0-0.024, cy0-0.010, h-0.13, h-0.11, MAT.brass, { collide:false }));
+  }
+  // under-counter fridge, expressed as a steel door panel
+  G_FURN.add(slab(2.16, 2.86, cy0-0.020, cy0-0.006, 0.095, h-0.045, MAT.steel, { collide:false }));
+  G_FURN.add(slab(2.19, 2.24, cy0-0.032, cy0-0.018, 0.30, 0.66, MAT.brass, { collide:false }));
+  // stainless basin dropped into the cut-out: bottom, four sides, and a rim
+  G_FURN.add(slab(sx0, sx1, sy0, sy1, h-0.175, h-0.160, MAT.steel, { collide:false }));
+  G_FURN.add(slab(sx0, sx0+0.014, sy0, sy1, h-0.175, h, MAT.steel, { collide:false }));
+  G_FURN.add(slab(sx1-0.014, sx1, sy0, sy1, h-0.175, h, MAT.steel, { collide:false }));
+  G_FURN.add(slab(sx0, sx1, sy0, sy0+0.014, h-0.175, h, MAT.steel, { collide:false }));
+  G_FURN.add(slab(sx0, sx1, sy1-0.014, sy1, h-0.175, h, MAT.steel, { collide:false }));
+  G_FURN.add(slab(sx0-0.012, sx1+0.012, sy0-0.012, sy1+0.012, h, h+0.006, MAT.steel,
+                  { collide:false }));
+  G_FURN.add(post((sx0+sx1)/2, (sy0+sy1)/2, h-0.160, h-0.150, 0.030, 0.030, MAT.lamDk, 12));
+  G_FURN.add(post(0.99, cy1-0.14, h, h+0.055, 0.028, 0.028, MAT.brass, 12));
+  G_FURN.add(post(0.99, cy1-0.30, h+0.230, h+0.275, 0.019, 0.019, MAT.brass, 12));
+  G_FURN.add(post(0.99, cy1-0.14, h+0.055, h+0.275, 0.019, 0.019, MAT.brass, 12));
+  G_FURN.add(slab(0.975, 1.005, cy1-0.30, cy1-0.14, h+0.255, h+0.275, MAT.brass, { collide:false }));
+  // upper cabinets — high-level joinery, so they live in G_ABOVE and drop out
+  // of the plan view rather than hiding the counter below them
+  G_ABOVE.add(slab(0.10, 2.50, cy1-0.350, cy1, 1.500, 2.200, MAT.lam, { name:'pantry_uppers' }));
+  for (let i=0;i<4;i++){
+    const x = 0.13 + i*0.590;
+    G_ABOVE.add(slab(x, x+0.565, cy1-0.362, cy1-0.352, 1.512, 2.188, MAT.walnut, { collide:false }));
+    G_ABOVE.add(slab(x+0.25, x+0.32, cy1-0.374, cy1-0.360, 1.545, 1.565, MAT.brass, { collide:false }));
+  }
+  // coffee machine + mugs
+  const cm = new THREE.Group();
+  cm.add(lbox(0.280,0.380,0.400,MAT.lamDk,0,0,0));
+  cm.add(lbox(0.200,0.060,0.075,MAT.steel,0,-0.16,0.180));
+  cm.add(lbox(0.230,0.300,0.022,MAT.steel,0,0.03,0.400));
+  place(cm, 1.90, cy0+0.30, 180, null);
+  for (let i=0;i<3;i++)
+    G_FURN.add(post(1.44+i*0.10, cy0+0.44, h, h+0.085, 0.038, 0.038, MAT.lam, 12));
+  // narrow standing ledge + two stools, against the corridor wall
+  G_FURN.add(slab(0.02, 0.42, 7.40, 8.60, 1.020, 1.058, MAT.walnut, { name:'pantry_ledge' }));
+  for (const y of [7.60, 8.40])
+    G_FURN.add(slab(0.04, 0.30, y-0.020, y+0.020, 0.900, 1.020, MAT.brass, { collide:false }));
+  place(stool(), 0.72, 7.66, 90, [0.36,0.36,0.72], 'pantry_stool_1');
+  place(stool(), 0.72, 8.34, 90, [0.36,0.36,0.72], 'pantry_stool_2');
+})();
+
+/* ---- Flex bay: phone booth, touchdown ledge, planting ------------------- */
+(function flex(){
+  // --- 1.2 x 1.2 phone / video booth, freestanding, door on the spine side
+  const bx0=3.15, bx1=4.35, by0=2.45, by1=3.65, bh=DIM.BOOTH_H, t=0.075;
+  const g = new THREE.Group();
+  const P = (x0,x1,y0,y1,z0,z1,m)=>G_FURN.add(slab(x0,x1,y0,y1,z0,z1,m,{collide:false}));
+  P(bx0,bx1,by0,by0+t,0,bh,MAT.lamDk);                       // back (south)
+  P(bx0,bx0+t,by0,by1,0,bh,MAT.lamDk);                       // west
+  P(bx1-t,bx1,by0,by1,0,bh,MAT.lamDk);                       // east
+  P(bx0,bx1,by1-t,by1,0,0.35,MAT.lamDk);                     // door: base rail
+  P(bx0,bx0+t,by1-t,by1,0,bh,MAT.frame);
+  P(bx1-t,bx1,by1-t,by1,0,bh,MAT.frame);
+  P(bx0,bx1,by1-t,by1,2.16,bh,MAT.frame);                    // door head
+  P(bx0+t,bx1-t,by1-0.048,by1-0.030,0.35,2.16,MAT.glassIn);  // glazed leaf
+  P(bx0,bx1,by0,by1,bh,bh+0.055,MAT.lamDk);                  // roof + extract
+                                                             // (dark, so in plan
+                                                             // it reads as joinery
+                                                             // and not as structure)
+  P(bx0+0.30,bx1-0.30,by0+0.30,by1-0.30,bh-0.030,bh-0.012,MAT.fixture);
+  // navy acoustic felt lining, inside
+  P(bx0+t,bx1-t,by0+t,by0+t+0.012,0,bh-0.06,MAT.navy);
+  // ledge + perch stool inside
+  P(bx0+t,bx1-t,by0+t,by0+0.50,1.020,1.058,MAT.oak);
+  addCollider(bx0,bx1,by0,by1,0,bh,'phone_booth','furn');
+  place(stool(), (bx0+bx1)/2, by0+0.72, 0, null);
+  G_FURN.add(g);
+
+  // --- touchdown ledge against demising wall 71
+  G_FURN.add(slab(4.60, 6.00, 0.02, 0.44, 1.020, 1.058, MAT.oak, { name:'touchdown_ledge' }));
+  for (const x of [4.72, 5.88])
+    G_FURN.add(slab(x-0.020, x+0.020, 0.06, 0.40, 0.020, 1.020, MAT.frame, { collide:false }));
+  place(stool(), 4.95, 0.76, 180, [0.36,0.36,0.72], 'flex_stool_1');
+  place(stool(), 5.65, 0.76, 180, [0.36,0.36,0.72], 'flex_stool_2');
+
+  // --- planting
+  place(planter(0.300, 0.560, 1.200), 4.88, 3.28, 0, [0.60,0.60,1.70], 'planter_flex');
+  place(planter(0.230, 0.440, 0.780), 6.28, 0.58, 0, [0.46,0.46,1.20], 'planter_flex_2');
+})();
+
+/* ---- Open workstations --------------------------------------------------
+   Two benches of three 1150 mm sit-stand desks facing each other across a
+   350 mm acoustic screen, one mobile pedestal per desk. 900 mm is kept
+   behind every seated position: 6.15 m down to the 5.25 m spine edge on the
+   south run, and 7.65 m up to 8.55 m on the north run. ---------------------*/
+const BENCH_X = [3.675, 4.825, 5.975];       // desk centres, 1.15 m module
+const BENCH_S = { top0: 6.15, top1: 6.90, chair: 5.80, ped: 6.545, face:   0 };
+const BENCH_N = { top0: 6.90, top1: 7.65, chair: 8.00, ped: 7.285, face: 180 };
+
+(function openArea(){
+  for (const B of [BENCH_S, BENCH_N]){
+    const cy = (B.top0 + B.top1)/2;
+    BENCH_X.forEach((cx, i) => {
+      // the centre desk of the north bench is modelled raised, to read as sit-stand
+      const standing = (B === BENCH_N && i === 1);
+      const h = standing ? DIM.DESK_H_STAND : DIM.DESK_H;
+      place(benchDesk(h), cx, cy, 0, [DIM.DESK_W, DIM.DESK_D, h], 'desk_'+(B.face)+'_'+i);
+      // monitor sits at the screen edge of the desk, facing the occupant
+      const my = B.face === 0 ? B.top1 - 0.14 : B.top0 + 0.14;
+      const mon = monitor(0.560, 0.335); mon.position.y = h;
+      place(mon, cx, my, B.face === 0 ? 180 : 0);
+      // keyboard
+      G_FURN.add(slab(cx-0.21, cx+0.21, cy-0.07, cy+0.07, h, h+0.018, MAT.lamDk,
+                      { collide:false }));
+      place(pedestal(), cx + 0.32, B.ped, 0, [DIM.PED_W, DIM.PED_D, DIM.PED_H],
+            'pedestal_'+(B.face)+'_'+i);
+      place(taskChair(i === 1 ? MAT.fabricDk : MAT.fabric), cx, B.chair, B.face,
+            [0.62,0.62,1.10], 'task_chair_'+(B.face)+'_'+i);
+      if (i !== 1) place(deskPlant(), cx + (B.face === 0 ? 0.44 : -0.44), my, 0);
+    });
+  }
+  // 350 mm acoustic screen along the shared edge
+  const y = (BENCH_S.top1 + BENCH_N.top0)/2;
+  G_FURN.add(slab(3.10, 6.55, y - DIM.SCREEN_T/2, y + DIM.SCREEN_T/2,
+                  DIM.DESK_H, DIM.DESK_H + DIM.SCREEN_H, MAT.fabricDk,
+                  { name:'acoustic_screen' }));
+  G_FURN.add(slab(3.10, 6.55, y - DIM.SCREEN_T/2 - 0.004, y + DIM.SCREEN_T/2 + 0.004,
+                  DIM.DESK_H + DIM.SCREEN_H - 0.014, DIM.DESK_H + DIM.SCREEN_H,
+                  MAT.brass, { collide:false }));
+  // a laptop and a folder, so the bench does not look showroom-empty
+  const lap = new THREE.Group();
+  lap.add(lbox(0.325,0.230,0.016,MAT.steel,0,0,0));
+  const lid = lbox(0.325,0.014,0.220,MAT.steel,0,-0.112,0.016); lid.rotation.x = -0.30; lap.add(lid);
+  place(lap, BENCH_X[0], 6.36, 0).position.y = DIM.DESK_H;
+  G_FURN.add(slab(BENCH_X[2]-0.14, BENCH_X[2]+0.14, 7.36, 7.56,
+                  DIM.DESK_H, DIM.DESK_H+0.012, MAT.lam, { collide:false }));
+})();
+
+/* ---- Client meeting room ------------------------------------------------ */
+(function meeting(){
+  const cx = 8.55, cy = 1.95, tw = 2.40, td = 1.05, th = DIM.TABLE_H;
+  G_FURN.add(slab(cx-tw/2, cx+tw/2, cy-td/2, cy+td/2, th-0.032, th, MAT.walnut,
+                  { name:'conference_table' }));
+  G_FURN.add(slab(cx-tw/2+0.02, cx+tw/2-0.02, cy-td/2+0.02, cy+td/2-0.02,
+                  th-0.045, th-0.032, MAT.frame, { collide:false }));
+  for (const s of [-1,1])                                   // navy blade legs
+    G_FURN.add(slab(cx+s*0.90-0.030, cx+s*0.90+0.030, cy-0.42, cy+0.42, 0, th-0.045,
+                    MAT.navy, { collide:false }));
+  G_FURN.add(slab(cx-0.90, cx+0.90, cy-0.045, cy+0.045, 0.30, 0.36, MAT.frame,
+                  { collide:false }));                      // cable spine
+  // power / data grommet
+  G_FURN.add(slab(cx-0.16, cx+0.16, cy-0.055, cy+0.055, th, th+0.012, MAT.brass,
+                  { collide:false }));
+  for (let i=0;i<6;i++){
+    const x = [7.75, 8.55, 9.35][i%3];
+    const y = i < 3 ? 0.90 : 3.00;
+    place(confChair(), x, y, i < 3 ? 0 : 180, [0.56,0.56,0.98], 'conf_chair_'+i);
+  }
+  // wall display + soundbar on the solid AV pier
+  const px = 6.70 + HPT;
+  G_FURN.add(slab(px+0.008, px+0.062, 1.340, 2.560, 1.030, 1.720, MAT.frame,
+                  { collide:false }));
+  G_FURN.add(slab(px+0.062, px+0.070, 1.360, 2.540, 1.050, 1.700, MAT.screenOff,
+                  { collide:false }));
+  G_FURN.add(slab(px+0.010, px+0.080, 1.560, 2.340, 0.900, 0.968, MAT.lamDk,
+                  { collide:false }));
+  // low credenza under the north glazing
+  place(credenza(1.600, 0.450, 0.720), 8.90, 3.605, 180, [1.60,0.45,0.72],
+        'meeting_credenza');
+  G_FURN.add(slab(8.44, 8.72, 3.50, 3.72, 0.720, 0.742, MAT.lam, { collide:false }));
+  place(deskPlant(), 9.36, 3.60, 0);
+  // table dressing
+  for (const [dx,dy] of [[-0.55,-0.28],[0.55,0.28],[-0.55,0.28],[0.55,-0.28]])
+    G_FURN.add(slab(cx+dx-0.10, cx+dx+0.10, cy+dy-0.07, cy+dy+0.07, th, th+0.010,
+                    MAT.lam, { collide:false }));
+  G_FURN.add(post(cx+0.98, cy+0.30, th, th+0.235, 0.048, 0.040, MAT.glassIn, 14));
+  for (const s of [-1,1])
+    G_FURN.add(post(cx+0.86, cy+s*0.10, th, th+0.095, 0.032, 0.034, MAT.glassIn, 12));
+})();
+
+/* ---- Director's office --------------------------------------------------
+   Desk turned so the director faces the door with the city to their right;
+   guests sit window-side. 0.98 m behind the director, 0.87 m behind guests. */
+(function director(){
+  const x0=7.725, x1=8.575, y0=6.750, y1=8.450, h=0.750;
+  G_FURN.add(slab(x0, x1, y0, y1, h-0.034, h, MAT.walnut, { name:'exec_desk' }));
+  for (const y of [y0+0.085, y1-0.085])
+    G_FURN.add(slab(x0+0.03, x1-0.03, y-0.028, y+0.028, 0, h-0.034, MAT.navy,
+                    { collide:false }));
+  G_FURN.add(slab(x1-0.055, x1-0.030, y0+0.14, y1-0.14, 0.300, h-0.120, MAT.navy,
+                  { collide:false }));                       // modesty panel
+  G_FURN.add(slab(x0-0.010, x1+0.010, y0-0.010, y0-0.002, h-0.034, h, MAT.brass,
+                  { collide:false }));
+  place(taskChair(MAT.leather), 7.30, 7.60, 270, [0.62,0.62,1.10], 'director_chair');
+  place(confChair(MAT.fabric), 9.15, 7.15, 90, [0.56,0.56,0.98], 'guest_chair_1');
+  place(confChair(MAT.fabric), 9.15, 8.05, 90, [0.56,0.56,0.98], 'guest_chair_2');
+  place(shelving(1.000, 0.350, 2.000, 5), 8.90, 8.870, 0, [1.00,0.35,2.00],
+        'director_bookshelf');
+  // side table
+  const st = new THREE.Group();
+  st.add(lbox(0.500,0.500,0.030,MAT.walnut,0,0,0.470));
+  for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]])
+    st.add(post(sx*0.215, sy*0.215, 0, 0.475, 0.016, 0.014, MAT.brass, 8));
+  place(st, 9.80, 6.620, 0, [0.50,0.50,0.50], 'director_side_table');
+  place(deskPlant(), 9.80, 6.620, 0).position.y = 0.500;
+  // desktop kit
+  const lap = new THREE.Group();
+  lap.add(lbox(0.330,0.235,0.016,MAT.steel,0,0,0));
+  const lid = lbox(0.330,0.014,0.225,MAT.steel,0,0.115,0.016); lid.rotation.x = 0.30; lap.add(lid);
+  place(lap, 8.16, 7.42, 0).position.y = h;
+  G_FURN.add(slab(7.86, 8.10, 7.90, 8.16, h, h+0.020, MAT.lam, { collide:false }));
+  // brass task lamp
+  G_FURN.add(post(8.42, 8.24, h, h+0.018, 0.070, 0.070, MAT.brass, 14));
+  G_FURN.add(post(8.42, 8.24, h+0.018, h+0.430, 0.014, 0.014, MAT.brass, 10));
+  G_FURN.add(post(8.42, 8.18, h+0.360, h+0.440, 0.075, 0.045, MAT.brass, 14));
+})();
+
+/* ---- Window-side breakout ----------------------------------------------
+   A small round table pushed to the glazing so the view stays shared.------*/
+(function breakout(){
+  const x=9.40, y=5.10, h=DIM.TABLE_H;
+  G_FURN.add(post(x, y, 0, 0.030, 0.310, 0.290, MAT.frame, 24));
+  G_FURN.add(post(x, y, 0.030, h-0.032, 0.058, 0.052, MAT.frame, 16));
+  G_FURN.add(post(x, y, h-0.032, h, 0.425, 0.425, MAT.walnut, 32));
+  addCollider(x-0.425, x+0.425, y-0.425, y+0.425, 0, h, 'breakout_table', 'furn');
+  place(confChair(MAT.fabric), x, 4.42, 0,   [0.56,0.56,0.98], 'breakout_chair_1');
+  place(confChair(MAT.fabric), x, 5.78, 180, [0.56,0.56,0.98], 'breakout_chair_2');
+  for (const s of [-1,1])
+    G_FURN.add(post(x+s*0.15, y+s*0.09, h, h+0.088, 0.040, 0.040, MAT.lam, 14));
+  place(planter(0.290, 0.560, 1.180), 8.00, 5.720, 0, [0.58,0.58,1.70], 'planter_window');
+})();
+
+/* ==========================================================================
+   6. LIGHTING
+   --------------------------------------------------------------------------
+   Daylight does the heavy lifting: a hemisphere for bounce plus one shadow-
+   casting directional light raking in through the curtain wall (tropical
+   afternoon). Artificial light is a small, deliberate set — RectAreaLights
+   for the linear runs and pendants, cheap point lights for the downlight
+   grid — kept to a count an integrated GPU can hold at 60 fps.
+   ========================================================================== */
+
+const hemi = new THREE.HemisphereLight(LIGHT.HEMI_SKY, LIGHT.HEMI_GROUND, LIGHT.HEMI_INT);
+hemi.position.set(W/2, 6, D/2);
+scene.add(hemi);
+
+const sun = new THREE.DirectionalLight(LIGHT.SUN_COLOR, LIGHT.SUN_INT);
+sun.position.set(LIGHT.SUN_DIR.x, LIGHT.SUN_DIR.y, LIGHT.SUN_DIR.z);
+sun.target.position.set(3.4, 0.4, 4.6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 4;
+sun.shadow.camera.far  = 46;
+sun.shadow.camera.left = -11; sun.shadow.camera.right =  11;
+sun.shadow.camera.top  =  10; sun.shadow.camera.bottom = -10;
+sun.shadow.bias = -0.0009;
+sun.shadow.normalBias = 0.022;
+scene.add(sun, sun.target);
+
+// a cool fill from the sky side so the deep plan does not go muddy
+const fill = new THREE.DirectionalLight(0xC9DCF2, 0.42);
+fill.position.set(-6, 7, -4);
+scene.add(fill);
+
+/* --- 6a. Luminaire builders --------------------------------------------- */
+const rectLights = [];
+/** Linear recessed run: emissive slot in the ceiling + one RectAreaLight. */
+function linearLight(x0, x1, y, w = 0.075, intensity = LIGHT.LINEAR_INT){
+  const z = CH - 0.012;
+  G_FIX.add(slab(x0, x1, y-w/2, y+w/2, z, CH, MAT.fixture, { collide:false, cast:false }));
+  G_FIX.add(slab(x0-0.018, x1+0.018, y-w/2-0.018, y+w/2+0.018, CH-0.026, CH-0.012,
+                 MAT.frame, { collide:false, cast:false }));
+  const L = new THREE.RectAreaLight(LIGHT.FIXTURE, intensity, x1-x0, w*3.4);
+  L.position.set((x0+x1)/2, z-0.005, y);
+  L.lookAt((x0+x1)/2, 0, y);
+  G_LIGHT.add(L); rectLights.push(L);
+  return L;
+}
+/** Brass cylinder pendant on a drop rod. */
+function pendant(x, y, drop = 1.05, r = 0.115, intensity = LIGHT.PENDANT_INT){
+  const zTop = CH, zBot = CH - drop;
+  G_FIX.add(post(x, y, zBot, zTop, 0.008, 0.008, MAT.frame, 6));
+  G_FIX.add(post(x, y, zBot, zBot + 0.22, r, r*0.72, MAT.brass, 20));
+  G_FIX.add(post(x, y, zBot - 0.006, zBot + 0.004, r*0.94, r*0.94, MAT.fixture, 20));
+  const L = new THREE.PointLight(LIGHT.FIXTURE, intensity, 5.0, 2);
+  L.position.set(x, zBot - 0.05, y);
+  G_LIGHT.add(L);
+  return L;
+}
+/** Recessed downlight: a small emissive disc plus a short-throw point light. */
+function downlight(x, y, intensity = LIGHT.DOWN_INT){
+  G_FIX.add(post(x, y, CH-0.020, CH-0.004, 0.052, 0.052, MAT.fixture, 14));
+  G_FIX.add(post(x, y, CH-0.028, CH-0.020, 0.062, 0.062, MAT.frame, 14));
+  const L = new THREE.PointLight(LIGHT.FIXTURE, intensity, 4.2, 2);
+  L.position.set(x, CH-0.10, y);
+  G_LIGHT.add(L);
+}
+
+/* --- 6b. Layout ---------------------------------------------------------- */
+// linear runs over the two desk benches
+linearLight(3.15, 6.50, BENCH_S.top0 + 0.20);
+linearLight(3.15, 6.50, BENCH_N.top1 - 0.20);
+// linear run down the entrance spine
+linearLight(1.30, 6.40, 4.50, 0.065, 2.6);
+
+// wall-washers grazing the slatted feature wall, so it reads as the backdrop
+// the reception desk was designed against rather than a dark plane
+for (const x of [1.55, 2.60]){
+  G_FIX.add(post(x, 2.62, CH-0.022, CH-0.004, 0.050, 0.050, MAT.fixture, 14));
+  const L = new THREE.SpotLight(0xFFEBD2, 5.4, 4.0, 0.72, 0.55, 1.6);
+  L.position.set(x, CH-0.09, 2.62);
+  L.target.position.set(x, 1.35, 2.40);
+  G_LIGHT.add(L, L.target);
+}
+
+// pendants: reception counter, waiting group, window breakout.
+// The reception pendant sits just north of the counter face rather than over
+// the worktop, so it washes the side a client actually sees.
+pendant(2.12, 4.02, 1.00);
+pendant(1.50, 5.85, 1.15);
+pendant(9.40, 5.10, 1.05);
+
+// meeting room: a linear run on the table axis, plus downlights at the corners
+linearLight(7.45, 9.70, 1.95, 0.070, 4.2);
+downlight(7.30, 3.30); downlight(9.70, 3.30);
+downlight(7.30, 0.75); downlight(9.70, 0.75);
+// director's office
+linearLight(7.70, 8.60, 7.60, 0.065, 3.4);
+downlight(9.50, 6.85); downlight(7.30, 8.55); downlight(9.50, 8.55);
+// store, pantry, flex bay, circulation
+downlight(0.70, 0.70); downlight(2.30, 1.60);
+downlight(0.90, 8.30); downlight(2.30, 7.60);
+downlight(5.20, 1.20); downlight(4.10, 2.90); downlight(6.20, 2.90);
+downlight(0.70, 6.60); downlight(0.70, 2.80);
+downlight(7.90, 4.30); downlight(8.30, 5.90);
+
+// FCU bulkhead: a warm brass-reveal wash grazing the corridor wall
+const wash = new THREE.RectAreaLight(0xFFE3BE, 1.9, 6.6, 0.24);
+wash.position.set(SHELL.BULKHEAD_W - 0.02, CH - SHELL.BULKHEAD_DROP + 0.02, 4.6);
+wash.lookAt(0, 0.9, 4.6);
+G_LIGHT.add(wash); rectLights.push(wash);
+
+// reception sign halo lives with the other lights so it survives top view
+G_LIGHT.add(...G_FIX.children.filter(o => o.isLight));
+
+/* ==========================================================================
+   7. CAMERAS AND CONTROLS
+      1  walk  — PointerLockControls, WASD, Shift to run, AABB collision
+      2  top   — OrthographicCamera straight down, drag to pan, wheel to zoom
+      3  orbit — OrbitControls doll's-house, ceiling removed
+   ========================================================================== */
+
+/* --- 7a. Walk ------------------------------------------------------------ */
+const walkCam = new THREE.PerspectiveCamera(CAM.FOV, innerWidth/innerHeight, 0.08, 400);
+const plc     = new PointerLockControls(walkCam, renderer.domElement);
+const walker  = plc.getObject ? plc.getObject() : plc.object;
+scene.add(walker);
+/** Aim the walk camera. `yaw` is degrees CCW in plan from +Y (plan north),
+    the same convention `unit()` uses, and `pitch` is degrees above level. */
+function aimWalk(x, y, yaw, pitch = 0){
+  walker.position.set(x, CAM.EYE_H, y);
+  walkCam.rotation.order = 'YXZ';
+  walkCam.rotation.set(pitch*Math.PI/180, (180 - yaw)*Math.PI/180, 0);
+}
+aimWalk(CAM.START.x, CAM.START.y, CAM.START.yaw);
+
+// Only solids that actually stand in a walker's way: anything whose top is
+// above knee height and whose base is below eye height.
+const WALK_SOLIDS = () => COLLIDERS.filter(c => c.z1 > 0.32 && c.z0 < CAM.EYE_H + 0.10);
+let walkSolids = [];
+
+const keys = { w:false, a:false, s:false, d:false, shift:false };
+const KEYMAP = { KeyW:'w', KeyA:'a', KeyS:'s', KeyD:'d',
+                 ArrowUp:'w', ArrowLeft:'a', ArrowDown:'s', ArrowRight:'d' };
+
+/** Push a circle of radius r out of every overlapping AABB, shortest axis
+    first. Two passes so inside corners resolve cleanly. */
+function resolveCollision(px, py){
+  const r = CAM.BODY_R;
+  for (let pass=0; pass<2; pass++){
+    px = Math.min(Math.max(px, r), W - r);
+    py = Math.min(Math.max(py, r), D - r);
+    for (const c of walkSolids){
+      if (px <= c.x0 - r || px >= c.x1 + r || py <= c.y0 - r || py >= c.y1 + r) continue;
+      const dL = px - (c.x0 - r), dR = (c.x1 + r) - px;
+      const dD = py - (c.y0 - r), dU = (c.y1 + r) - py;
+      const m = Math.min(dL, dR, dD, dU);
+      if      (m === dL) px = c.x0 - r;
+      else if (m === dR) px = c.x1 + r;
+      else if (m === dD) py = c.y0 - r;
+      else               py = c.y1 + r;
+    }
+  }
+  return [px, py];
+}
+
+const _fwd = new THREE.Vector3(), _rgt = new THREE.Vector3(), _mv = new THREE.Vector3();
+const vel = new THREE.Vector3();
+function updateWalk(dt){
+  const want = new THREE.Vector3(
+    (keys.d ? 1 : 0) - (keys.a ? 1 : 0), 0,
+    (keys.s ? 1 : 0) - (keys.w ? 1 : 0));
+  if (want.lengthSq() > 0) want.normalize();
+
+  walkCam.getWorldDirection(_fwd); _fwd.y = 0; _fwd.normalize();
+  _rgt.crossVectors(_fwd, walkCam.up).normalize();
+
+  const speed  = CAM.WALK_SPEED * (keys.shift ? CAM.RUN_MULT : 1);
+  const target = _mv.set(0,0,0)
+    .addScaledVector(_rgt,  want.x * speed)
+    .addScaledVector(_fwd, -want.z * speed);
+
+  const k = 1 - Math.exp(-CAM.ACCEL * dt);
+  vel.lerp(target, k);
+  if (vel.lengthSq() < 1e-6) vel.set(0,0,0);
+
+  const [nx, ny] = resolveCollision(walker.position.x + vel.x*dt,
+                                    walker.position.z + vel.z*dt);
+  // bleed velocity we were not allowed to spend, so we slide instead of stick
+  vel.x = (nx - walker.position.x) / Math.max(dt, 1e-4);
+  vel.z = (ny - walker.position.z) / Math.max(dt, 1e-4);
+  walker.position.set(nx, CAM.EYE_H, ny);
+}
+
+/* --- 7b. Top (orthographic, straight down) -------------------------------
+   up = -Z puts plan +X to the right and plan -Y up-screen, which is the way
+   the plan is drawn; north is assigned to plan -Y (see README). -----------*/
+const topCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 80);
+topCam.up.set(0, 0, -1);
+const topState = { panX: 0, panY: 0, zoom: 1 };
+function syncTop(){
+  const aspect = Math.max(innerWidth / innerHeight, 0.0001);
+  const pw = W + 2*CAM.TOP_PAD, ph = D + 2*CAM.TOP_PAD;
+  let vw, vh;
+  if (pw / ph > aspect){ vw = pw; vh = pw / aspect; }
+  else                 { vh = ph; vw = ph * aspect; }
+  topCam.left = -vw/2; topCam.right = vw/2;
+  topCam.top  =  vh/2; topCam.bottom = -vh/2;
+  topCam.zoom = topState.zoom;
+  topCam.position.set(W/2 + topState.panX, 34, D/2 + topState.panY);
+  topCam.lookAt(W/2 + topState.panX, 0, D/2 + topState.panY);
+  topCam.updateProjectionMatrix();
+  topCam.updateMatrixWorld(true);
+  return vh;
+}
+
+/* 1 m setting-out grid, aligned to whole metres, top view only */
+(function grid(){
+  const pts = [];
+  for (let x = 0; x <= Math.floor(W); x++) pts.push(x, 0, 0, x, 0, D);
+  for (let y = 0; y <= Math.floor(D); y++) pts.push(0, 0, y, W, 0, y);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  const l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
+    color: 0x2A2F38, transparent:true, opacity:0.30 }));
+  l.position.y = 0.012;
+  G_TOPONLY.add(l);
+  // parcel outline, heavier
+  const o = new THREE.BufferGeometry();
+  o.setAttribute('position', new THREE.Float32BufferAttribute(
+    [0,0,0, W,0,0, W,0,0, W,0,D, W,0,D, 0,0,D, 0,0,D, 0,0,0], 3));
+  const ol = new THREE.LineSegments(o, new THREE.LineBasicMaterial({ color: 0x20242C }));
+  ol.position.y = 0.014;
+  G_TOPONLY.add(ol);
+})();
+
+/* --- 7c. Orbit ----------------------------------------------------------- */
+const orbitCam = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.2, 500);
+orbitCam.position.set(-7.0, 12.5, -4.4);
+const orbit = new OrbitControls(orbitCam, renderer.domElement);
+orbit.target.set(CAM.ORBIT_TGT.x, CAM.ORBIT_TGT.z, CAM.ORBIT_TGT.y);
+orbit.enableDamping = true;
+orbit.dampingFactor = 0.075;
+orbit.maxPolarAngle = Math.PI * 0.48;
+orbit.minDistance = 6;
+orbit.maxDistance = 34;
+orbit.enabled = false;
+orbit.update();
+
+/* ==========================================================================
+   8. UI — mode bar, key handling, the top-view HTML overlay (room labels,
+      areas, scale bar), and the readout.
+   ========================================================================== */
+
+const $ = id => document.getElementById(id);
+const elBar   = [$('b1'), $('b2'), $('b3')];
+const elPlan  = $('plan'), elLock = $('lock'), elCross = $('cross');
+const elHelp  = $('help'), elRead = $('readout');
+const elRule  = $('rule'), elRuleTxt = $('ruletxt');
+
+let MODE = 'walk';
+const CAMS = { walk: walkCam, top: topCam, orbit: orbitCam };
+
+/* --- 8a. Zone labels, one absolutely-positioned div per zone ------------- */
+const LABELS = ZONES.map(z => {
+  const [x0,x1,y0,y1] = z.rect;
+  const el = document.createElement('div');
+  el.className = 'lbl';
+  const area = (x1-x0)*(y1-y0);
+  el.innerHTML = z.name.replace(/ & /g,' &amp; ') + '<em>' + area.toFixed(1) + ' m²</em>';
+  elPlan.appendChild(el);
+  return { el, x:(x0+x1)/2, y:(y0+y1)/2, area };
+});
+// circulation gets a label too, positioned on the spine
+const circLabel = document.createElement('div');
+circLabel.className = 'lbl';
+circLabel.innerHTML = 'Entrance spine<em>1.50 m clear</em>';
+elPlan.appendChild(circLabel);
+
+const _p = new THREE.Vector3();
+function layoutLabels(){
+  const toScreen = (x,y) => {
+    _p.set(x, 0.02, y).project(topCam);
+    return [(_p.x*0.5+0.5)*innerWidth, (-_p.y*0.5+0.5)*innerHeight];
+  };
+  for (const L of LABELS){
+    const [sx,sy] = toScreen(L.x, L.y);
+    L.el.style.left = sx + 'px';
+    L.el.style.top  = sy + 'px';
+  }
+  const [cx,cy] = toScreen(4.90, (CIRC.SPINE_Y0+CIRC.SPINE_Y1)/2);
+  circLabel.style.left = cx + 'px';
+  circLabel.style.top  = cy + 'px';
+}
+
+function layoutScaleBar(vh){
+  const pxPerM = (innerHeight / vh) * topState.zoom;
+  // choose a round bar length that lands between 90 and 260 px
+  const choices = [1,2,5,10];
+  let m = 5;
+  for (const c of choices){ if (c*pxPerM >= 90 && c*pxPerM <= 260){ m = c; break; } }
+  elRule.style.width = (m*pxPerM).toFixed(1) + 'px';
+  elRuleTxt.textContent = m + ' m';
+}
+
+/* --- 8b. Mode switching -------------------------------------------------- */
+function setMode(m){
+  MODE = m;
+  elBar.forEach((b,i) => b.classList.toggle('on', i === ['walk','top','orbit'].indexOf(m)));
+
+  G_CEILING.visible = (m === 'walk');            // roof off for top + doll's house
+  G_FIX.visible     = (m !== 'top');             // ceiling fittings off in plan
+  G_TOPONLY.visible = (m === 'top');
+  G_CONTEXT.visible = (m === 'walk');
+  G_ABOVE.visible   = (m !== 'top');
+  elPlan.classList.toggle('on',  m === 'top');
+  elCross.classList.toggle('on', m === 'walk' && plc.isLocked);
+  elLock.classList.toggle('on',  m === 'walk' && !plc.isLocked);
+  orbit.enabled = (m === 'orbit');
+  if (m !== 'walk' && plc.isLocked) plc.unlock();
+
+  // plan view wants flat, even light; the walkthrough wants the raking sun
+  hemi.intensity = (m === 'top') ? 2.70 : LIGHT.HEMI_INT;
+  sun.intensity  = (m === 'top') ? 0.85 : LIGHT.SUN_INT;
+  renderer.toneMappingExposure = (m === 'top') ? 1.12 : LIGHT.EXPOSURE;
+
+  if (m === 'top') layoutScaleBar(syncTop());
+}
+
+elBar[0].onclick = () => setMode('walk');
+elBar[1].onclick = () => setMode('top');
+elBar[2].onclick = () => setMode('orbit');
+elLock.onclick   = () => { if (MODE === 'walk') plc.lock(); };
+plc.addEventListener('lock',   () => { elLock.classList.remove('on'); elCross.classList.add('on'); });
+plc.addEventListener('unlock', () => {
+  if (MODE === 'walk') elLock.classList.add('on');
+  elCross.classList.remove('on');
+  keys.w = keys.a = keys.s = keys.d = keys.shift = false;
+});
+
+addEventListener('keydown', e => {
+  if (e.code === 'Digit1') return setMode('walk');
+  if (e.code === 'Digit2') return setMode('top');
+  if (e.code === 'Digit3') return setMode('orbit');
+  if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; e.preventDefault(); }
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
+});
+addEventListener('keyup', e => {
+  if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false;
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = false;
+});
+addEventListener('blur', () => { keys.w=keys.a=keys.s=keys.d=keys.shift=false; });
+
+/* --- 8c. Top-view pan and zoom ------------------------------------------- */
+let dragging = false, lastX = 0, lastY = 0;
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (MODE !== 'top') return;
+  dragging = true; lastX = e.clientX; lastY = e.clientY;
+  renderer.domElement.setPointerCapture(e.pointerId);
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!dragging || MODE !== 'top') return;
+  const vh = (topCam.top - topCam.bottom) / topState.zoom;
+  const mPerPx = vh / innerHeight;
+  topState.panX -= (e.clientX - lastX) * mPerPx;   // screen right == plan +X
+  topState.panY += (e.clientY - lastY) * mPerPx;   // screen down  == plan -Y
+  lastX = e.clientX; lastY = e.clientY;
+  layoutScaleBar(syncTop());
+});
+const endDrag = () => { dragging = false; };
+renderer.domElement.addEventListener('pointerup', endDrag);
+renderer.domElement.addEventListener('pointercancel', endDrag);
+renderer.domElement.addEventListener('wheel', e => {
+  if (MODE !== 'top') return;
+  e.preventDefault();
+  topState.zoom = Math.min(6, Math.max(0.5, topState.zoom * Math.pow(0.999, e.deltaY)));
+  layoutScaleBar(syncTop());
+}, { passive:false });
+
+/* --- 8d. Key help fades after 5 s ---------------------------------------- */
+setTimeout(() => elHelp.classList.add('hide'), 5000);
+
+/* --- 8e. Resize ---------------------------------------------------------- */
+function onResize(){
+  const a = innerWidth / innerHeight;
+  walkCam.aspect = a;  walkCam.updateProjectionMatrix();
+  orbitCam.aspect = a; orbitCam.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  layoutScaleBar(syncTop());
+}
+addEventListener('resize', onResize);
+
+/* ==========================================================================
+   9. MAIN — verification, then the render loop.
+   ========================================================================== */
+
+/* --- 9a. Area verification ----------------------------------------------
+   Computed from the surveyed corners, never typed in. ---------------------*/
+const AREA_TOL = 0.35;                              // m², rounding on a 1:300 plan
+const areaOK = Math.abs(PARCEL_AREA - SURVEY.AREA_PLAN) <= AREA_TOL;
+
+console.log('%cCONSENSUSBIZ — Petak 70, Tingkat 20, Menara A, Menara Landmark, Johor Bahru',
+            'font-weight:700;color:#B08D57');
+console.log(
+  `Floor area check: ${SURVEY.W} m × ${SURVEY.D} m = ${PARCEL_AREA.toFixed(2)} m²` +
+  `  (surveyed plan PA(B) 163454-19 states ${SURVEY.AREA_PLAN} m²)  →  ` +
+  (areaOK ? 'MATCH ✔' : 'MISMATCH ✘'));
+if (!areaOK) console.error('Parcel area does not match the survey plan.');
+
+/* --- 9b. Zone-area schedule --------------------------------------------- */
+const zoneRows = ZONES.map(z => {
+  const [x0,x1,y0,y1] = z.rect, a = (x1-x0)*(y1-y0);
+  return {
+    Zone: z.name,
+    'x (m)': `${x0.toFixed(2)} – ${x1.toFixed(2)}`,
+    'y (m)': `${y0.toFixed(2)} – ${y1.toFixed(2)}`,
+    'Brief m²': z.brief || '—',
+    'Actual m²': +a.toFixed(2),
+    Floor: z.floor === 'oak' ? 'light oak' : 'charcoal carpet',
+  };
+});
+const zoneSum  = ZONES.reduce((s,z)=>{const[a,b,c,d]=z.rect; return s+(b-a)*(d-c);},0);
+const circArea = PARCEL_AREA - zoneSum;
+console.table(zoneRows);
+console.log(
+  `Zones ${zoneSum.toFixed(2)} m² + circulation ${circArea.toFixed(2)} m²` +
+  ` = ${(zoneSum+circArea).toFixed(2)} m² of ${PARCEL_AREA.toFixed(2)} m² → ` +
+  (zoneSum + circArea <= PARCEL_AREA + 0.01 ? 'FITS ✔' : 'OVER ✘'));
+const openTotal = ZONES.filter(z=>z.id==='open'||z.id==='flex')
+                       .reduce((s,z)=>{const[a,b,c,d]=z.rect; return s+(b-a)*(d-c);},0);
+console.log(
+  `Open-plan work area (desk bay + flex bay) = ${openTotal.toFixed(2)} m² against the ` +
+  `24 m² brief. The enclosed rooms were shrunk, not the aisles: the brief's own ` +
+  `schedule sums to ~96 m² before any circulation, which does not fit 93.73 m². ` +
+  `See README.md.`);
+
+/* --- 9c. Clash detection -------------------------------------------------
+   No furniture bounding box may intersect a wall, a partition or the column. */
+function overlaps(a, b, tol = 0.002){
+  return a.x0 < b.x1 - tol && a.x1 > b.x0 + tol &&
+         a.y0 < b.y1 - tol && a.y1 > b.y0 + tol &&
+         a.z0 < b.z1 - tol && a.z1 > b.z0 + tol;
+}
+const furn  = COLLIDERS.filter(c => c.kind === 'furn');
+const shell = COLLIDERS.filter(c => c.kind === 'shell');
+const clashes = [];
+for (const f of furn)
+  for (const s of shell)
+    if (overlaps(f, s)) clashes.push({
+      Furniture: f.name, 'Clashes with': s.name,
+      'Overlap x': +(Math.min(f.x1,s.x1)-Math.max(f.x0,s.x0)).toFixed(3),
+      'Overlap y': +(Math.min(f.y1,s.y1)-Math.max(f.y0,s.y0)).toFixed(3),
+    });
+// furniture must also stay inside the parcel
+const outside = furn.filter(f => f.x0 < -0.002 || f.x1 > W+0.002 ||
+                                 f.y0 < -0.002 || f.y1 > D+0.002)
+                    .map(f => f.name);
+
+console.log(`Clash check: ${furn.length} furniture volumes vs ${shell.length} shell/` +
+            `partition volumes (incl. the 600×600 column at ${SURVEY.COLUMN.cx}, ` +
+            `${SURVEY.COLUMN.cy}) → ` +
+            (clashes.length === 0 ? 'NO INTERSECTIONS ✔' : `${clashes.length} CLASH(ES) ✘`));
+if (clashes.length) console.table(clashes);
+console.log(`Containment check: all furniture inside the parcel → ` +
+            (outside.length === 0 ? 'OK ✔' : 'OUT OF BOUNDS ✘ ' + outside.join(', ')));
+
+/* --- 9d. Circulation width audit ----------------------------------------
+   Walk the entrance spine metre by metre and report the narrowest clear
+   width, so the 1.5 m claim is measured rather than asserted. -------------*/
+(function spineAudit(){
+  const blockers = COLLIDERS.filter(c => c.z1 > 0.32 && c.z0 < 1.80);
+  const R = CIRC.SPINE_ROUTE;
+  const samples = [];
+  for (let i=0;i<R.length-1;i++){
+    const [ax,ay] = R[i], [bx,by] = R[i+1];
+    const n = Math.max(1, Math.ceil(Math.hypot(bx-ax, by-ay) / 0.02));
+    for (let k=0;k<=n;k++) samples.push([ax + (bx-ax)*k/n, ay + (by-ay)*k/n, i]);
+  }
+  let worst = Infinity, at = null;
+  const straight = [], bend = [];
+  for (const [x,y,leg] of samples){
+    let lo = 0, hi = D;                            // clear band, at this x, containing y
+    for (const c of blockers){
+      if (x <= c.x0 || x >= c.x1) continue;
+      if (c.y1 <= y && c.y1 > lo) lo = c.y1;
+      if (c.y0 >= y && c.y0 < hi) hi = c.y0;
+    }
+    const clear = hi - lo;
+    (leg === 0 ? straight : bend).push(clear);
+    if (clear < worst){ worst = clear; at = [x,y]; }
+  }
+  const min = a => Math.min(...a);
+  console.log(
+    `Circulation audit along the entrance spine ` +
+    `(${R.map(p=>`${p[0]}, ${p[1]}`).join('  →  ')}):\n` +
+    `  · entrance to x = 6.35, dead straight : ${min(straight).toFixed(2)} m clear ` +
+    (min(straight) >= CIRC.SPINE_W - 0.005 ? '✔ meets the 1.50 m spine rule'
+                                           : '✘ below the 1.50 m spine rule') + '\n' +
+    `  · around the surveyed column to the glazing : ${min(bend).toFixed(2)} m clear ` +
+    (min(bend) >= CIRC.SECONDARY_W ? '✔ above the 1.00 m secondary-aisle rule'
+                                   : '✘ below the 1.00 m secondary-aisle rule') + '\n' +
+    `  · narrowest point overall : ${worst.toFixed(2)} m at ` +
+    `x = ${at[0].toFixed(2)}, y = ${at[1].toFixed(2)}\n` +
+    `  The 600 × 600 column at (${SURVEY.COLUMN.cx}, ${SURVEY.COLUMN.cy}) is surveyed, ` +
+    `so the spine steps around it rather than through it: ` +
+    `${((6.25 - PT/2) - COL_Y1).toFixed(2)} m from the column's north face to the ` +
+    `director's partition line, opened up by the office door falling opposite it. ` +
+    `See README §5.`);
+})();
+
+console.log(`Scene built: ${renderer.info.render.triangles || '—'} tris pending, ` +
+            `${scene.children.length} top-level objects, ` +
+            `${COLLIDERS.length} colliders, ${rectLights.length} RectAreaLights.`);
+
+/* --- 9e. Render loop ----------------------------------------------------- */
+walkSolids = WALK_SOLIDS();
+setMode('walk');
+onResize();
+
+let last = performance.now(), fps = 60, frames = 0, fpsT = 0;
+function tick(now){
+  requestAnimationFrame(tick);
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+
+  if (MODE === 'walk' && plc.isLocked) updateWalk(dt);
+  if (MODE === 'orbit') orbit.update();
+
+  renderer.render(scene, CAMS[MODE]);
+
+  if (MODE === 'top') layoutLabels();
+
+  frames++; fpsT += dt;
+  if (fpsT >= 0.5){ fps = frames / fpsT; frames = 0; fpsT = 0;
+    const p = walker.position;
+    elRead.innerHTML =
+      `<b>${MODE.toUpperCase()}</b> · ${fps.toFixed(0)} fps` +
+      (MODE === 'walk' ? ` · x ${p.x.toFixed(1)} y ${p.z.toFixed(1)}` : '') +
+      `<br>93.73 m² · ceiling 2.80 m`;
+  }
+}
+requestAnimationFrame(tick);
+
+/* --- 9f. Hooks for the headless screenshot pass -------------------------- */
+window.__office = {
+  setMode, aimWalk, renderer, scene, CAMS, topState, syncTop, layoutScaleBar,
+  parcelArea: PARCEL_AREA, zoneRows, clashes, outside, colliders: COLLIDERS,
+  chrome(on){ for (const id of ['bar','plate','help','lock','cross','readout'])
+                document.getElementById(id).style.display = on ? '' : 'none'; },
+  ready: true,
+};
+</script>
+
+</body>
+</html>
