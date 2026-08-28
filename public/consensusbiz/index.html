@@ -313,7 +313,7 @@
 <div id="plate">
   <h1>Consensusbiz</h1>
   <p>Petak 70, Tingkat 20, Menara A<br>Menara Landmark, Johor Bahru<br>
-     Strata parcel 93.7 m² &middot; PA(B) 163454-19</p>
+     Measured 88.5 m² &middot; site survey 28 Aug 2026</p>
 </div>
 
 <div id="plan">
@@ -374,19 +374,44 @@ import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUnifo
 /* --- 1a. SURVEYED (from strata plan PA(B) 163454-19, Lot 18377, 1:300) ----
    These five groups are measured site facts. Do not edit without re-checking
    the survey plan. Everything below them is design. -------------------------*/
+/* MEASURED ON SITE, 28 Aug 2026 — hand survey (RHB notebook) plus 20 photos.
+   These SUPERSEDE the strata-plan figures the brief quoted. Every one of them
+   differs, and the differences are not small:
+
+     brief said                    tape says
+     10.30 x 9.10 m, 93.73 m2      8.839 x 10.008 m, 88.46 m2
+     2.80 m ceiling                2.40 m
+     600 x 600 square column       round, ~650 dia
+     full-height curtain wall      punched windows, 1.651 x 1.524, 750 sill
+     glazed door + sidelight       two solid 900 x 2100 fire doors, in the
+                                   two corners of the entrance wall
+
+   Imperial as measured, metric as used:
+     29'      = 8.839   32'10"  = 10.008   21'1"  = 6.426   11'10" = 3.607
+     17'10"   = 5.436   11'6"   = 3.505    8'7.5" = 2.629   8'6.5" = 2.604
+     5'5"     = 1.651   5'      = 1.524    4'     = 1.219                    */
 const SURVEY = {
-  // Parcel is a clean rectangle: (0,0) (10.3,0) (10.3,9.1) (0,9.1)
-  W  : 10.3,          // corridor wall -> curtain wall
-  D  : 9.1,           // demising 71 -> demising 69
-  AREA_PLAN : 94.0,   // area printed on the surveyed strata plan, m2
+  // x runs from the entrance wall to the window wall, y along the entrance
+  // wall. On the notebook page that is the 32'10" and the 29' respectively.
+  W  : 10.008,        // 32'10"  entrance wall -> window wall
+  D  :  8.839,        // 29'     across
+  AREA_PLAN : 88.46,  // measured; the strata plan's 94 m2 is to a different line
 
-  SLAB_TO_SLAB  : 3.6,
-  CEILING       : 2.8,   // finished ceiling above FFL
-  RAISED_FLOOR  : 0.1,   // raised access floor build-up below FFL
+  SLAB_TO_SLAB  : 3.6,   // NOT measured — slab above the grid ceiling is unseen
+  CEILING       : 2.40,  // measured: "Office Ceiling Height 2400mm"
+  RAISED_FLOOR  : 0.0,   // none — carpet is laid straight onto the slab
 
-  COLUMN : { cx: 7.2, cy: 4.6, size: 0.6 },   // 600x600 structural column
-  MULLION_PITCH : 1.5,                        // curtain wall mullion spacing
-  ENTRANCE_CY   : 4.5,                        // centreline of entrance assembly
+  COLUMN : { cx: 6.43, cy: 5.44, r: 0.325 },   // round, not square
+
+  // Punched windows in a solid facade. Widths are measured; the setting-out
+  // along the facade is the least certain thing on the page, so it is a plain
+  // list of window start positions — correct these first if the site says so.
+  WIN_W : 1.651, WIN_H : 1.524, WIN_SILL : 0.750,
+  WIN_AT: [0.447, 2.545, 4.643, 6.741],
+
+  // two solid fire doors, one in each corner of the entrance wall
+  DOORS : [{ a: 0.35, b: 1.25 }, { a: 7.59, b: 8.49 }],
+  MAIN_DOOR_CY : 0.80,        // the one you arrive through
 };
 
 // Surveyed parcel corners, kept explicit so the area check below is honest.
@@ -445,15 +470,20 @@ const C = {
    Rectangles are clear internal, [x0,x1,y0,y1]. `floor` picks the finish.
    Areas are computed, never typed, so the console table cannot drift from
    the geometry. -----------------------------------------------------------*/
+/* Re-planned for the measured 8.839 x 10.008 shell. You arrive in a CORNER —
+   both doors are in the corners of the entrance wall — so the spine runs east
+   along the y = 0 wall from the main door rather than through the middle, and
+   reception faces back down it. The second door serves a back-of-house lobby
+   between the store and the pantry. */
 const ZONES = [
-  { id:'store',   name:'Document & Compliance Store', brief: 7, rect:[0.00, 3.00, 0.00, 2.30], floor:'carpet' },
-  { id:'recep',   name:'Reception & Waiting',         brief:14, rect:[0.00, 3.05, 2.30, 7.00], floor:'oak'    },
-  { id:'pantry',  name:'Pantry Nook',                 brief: 6, rect:[0.00, 3.00, 7.00, 9.10], floor:'oak'    },
-  { id:'flex',    name:'Flex Bay & Phone Booth',      brief: 0, rect:[3.05, 6.70, 0.00, 3.75], floor:'oak'    },
-  { id:'open',    name:'Open Workstations',           brief:24, rect:[3.05, 6.70, 5.25, 9.10], floor:'oak'    },
-  { id:'meet',    name:"Client Meeting Room",         brief:14, rect:[6.70,10.30, 0.00, 3.90], floor:'carpet' },
-  { id:'break',   name:'Window Breakout',             brief: 5, rect:[8.20,10.30, 3.90, 6.25], floor:'oak'    },
-  { id:'dir',     name:"Director's Office",           brief:11, rect:[6.70,10.30, 6.25, 9.10], floor:'carpet' },
+  { id:'recep',   name:'Reception & Waiting',         brief:14, rect:[0.00, 3.10, 0.00, 4.10],  floor:'oak'    },
+  { id:'store',   name:'Document & Compliance Store', brief: 7, rect:[0.00, 3.10, 4.10, 6.60],  floor:'carpet' },
+  { id:'pantry',  name:'Pantry Nook',                 brief: 6, rect:[2.00, 4.20, 6.60, 8.839], floor:'oak'    },
+  { id:'flex',    name:'Flex Bay & Phone Booth',      brief: 0, rect:[3.10, 6.50, 0.00, 3.60],  floor:'oak'    },
+  { id:'open',    name:'Open Workstations',           brief:24, rect:[3.10, 6.50, 5.10, 8.839], floor:'oak'    },
+  { id:'meet',    name:'Client Meeting Room',         brief:14, rect:[6.50,10.008, 0.00, 3.60], floor:'carpet' },
+  { id:'break',   name:'Window Breakout',             brief: 5, rect:[8.10,10.008, 3.60, 6.00], floor:'oak'    },
+  { id:'dir',     name:"Director's Office",           brief:11, rect:[6.50,10.008, 6.00, 8.839],floor:'carpet' },
 ];
 // Zone rectangles are dimensioned to PARTITION CENTRELINES, the usual space-
 // planning convention; clear internal dims are ~45 mm less on each partitioned
@@ -465,17 +495,18 @@ const ZONES = [
 
 /* --- 1e. CIRCULATION RULES (checked, not just asserted) ------------------ */
 const CIRC = {
-  SPINE_W       : 1.50,   // entrance -> curtain wall
-  SPINE_Y0      : 3.75,   // spine band, aligned on the entrance assembly
-  SPINE_Y1      : 5.25,
+  SPINE_W       : 1.50,   // entrance -> window wall
+  SPINE_Y0      : 0.15,   // the spine hugs the y = 0 wall, because the main
+  SPINE_Y1      : 1.65,   // door is in the corner, not the middle
   SECONDARY_W   : 1.00,
   SEATED_CLEAR  : 0.90,   // behind every seated chair
   // The route the spine actually takes: dead straight from the entrance to
   // x = 6.35, then clear of the north face of the surveyed column (y = 4.90),
   // south of the window planter, and out to the breakout at the glazing.
   // Section 9d measures clear width along it. Leg 0 is the straight run.
-  SPINE_ROUTE   : [[0.30, 4.50], [6.35, 4.50], [6.85, 5.45],
-                   [7.58, 5.45], [8.40, 4.95], [8.85, 5.05]],
+  // in through the corner door, east along the y = 0 wall, then north around
+  // the round column and out to the breakout at the window
+  SPINE_ROUTE   : [[0.30, 0.85], [5.85, 0.85], [5.85, 4.30], [8.30, 4.60]],
 };
 
 /* --- 1f. FURNITURE DIMENSIONS ------------------------------------------- */
@@ -709,6 +740,11 @@ const MAT = {
   wall       : std({ map:TEX.paint,  color:C.WALL, roughness:0.94 }),
   wallSide   : std({ color:C.WALL_SHADE, roughness:0.94 }),
   ceiling    : std({ color:C.CEILING, roughness:0.96 }),
+  // as-found: 600 x 600 mineral tile on an exposed tee grid, and dark grey
+  // fire-door leaves in the entrance wall
+  ceilTile   : std({ color:0xE8E6DF, roughness:0.99 }),
+  grid       : std({ color:0xBFBCB4, roughness:0.55, metalness:0.25 }),
+  fireDoor   : std({ color:0x4A4E54, roughness:0.62 }),
   slabSoffit : std({ map:TEX.slab, color:C.SLAB, roughness:0.98 }),
   navy       : std({ color:C.NAVY,  roughness:0.55, metalness:0.05 }),
   brass      : std({ color:C.BRASS, roughness:0.34, metalness:0.85 }),
@@ -838,11 +874,12 @@ for (const z of ZONES){
   p.name = 'carpet_' + z.id;
   G_SHELL.add(p);
 }
-// Raised access floor build-up. Its top is held 12 mm below FFL so it cannot
-// z-fight with the finish above it — from any camera you see the oak, not the
-// dark plenum, and the edge still reads as a shadow line at the glazing.
-G_SHELL.add(slab(0, W, 0, D, -SURVEY.RAISED_FLOOR, -0.012, MAT.lamDk,
-                 { collide:false, cast:false }));
+// No raised floor on site — carpet is laid straight onto the slab — so there
+// is no plenum to draw. Drawing a zero-height one here z-fought the finish and
+// turned the whole floor black.
+if (SURVEY.RAISED_FLOOR > 0.02)
+  G_SHELL.add(slab(0, W, 0, D, -SURVEY.RAISED_FLOOR, -0.012, MAT.lamDk,
+                   { collide:false, cast:false }));
 
 /* --- 3b. Wall builders ---------------------------------------------------
    `along:'y'` runs the wall in the Y direction at plan x = at (thickness in
@@ -945,107 +982,81 @@ function glazedWall(o){
   }
 }
 
-/* --- 3c. Corridor wall (x = 0) ------------------------------------------
-   Solid — lift lobbies, two lift banks and two fire stairs sit beyond it.
-   The only opening is the entrance: a 1.0 m glazed door leaf (modelled as an
-   open aperture) plus a 0.6 m glazed sidelight, assembly centred on y=4.5. --*/
-const ENTRY_A = SURVEY.ENTRANCE_CY - (SHELL.ENTRY_DOOR_W + SHELL.ENTRY_SIDE_W)/2; // 3.70
-const ENTRY_B = ENTRY_A + SHELL.ENTRY_DOOR_W;                                     // 4.70
-const ENTRY_C = ENTRY_B + SHELL.ENTRY_SIDE_W;                                     // 5.30
-
-solidWall({ along:'y', at:-SHELL.WALL_T, t:SHELL.WALL_T, from:-SHELL.WALL_T, to:D+SHELL.WALL_T,
-            name:'corridor_wall', holes:[{a:ENTRY_A, b:ENTRY_C, head:CH, full:true}] });
-// entrance: door aperture (void) + head, then the glazed sidelight
-G_PART.add(slab(-SHELL.WALL_T, 0, ENTRY_A, ENTRY_B, SHELL.DOOR_H+0.12, CH, MAT.wall,
-                { collide:false, name:'entry_head' }));
-G_PART.add(slab(-SHELL.WALL_T-0.006, 0.006, ENTRY_A, ENTRY_B,
-                SHELL.DOOR_H+0.10, SHELL.DOOR_H+0.12, MAT.brass, { collide:false }));
-// door jambs + sidelight framing
-for (const p of [[ENTRY_A-0.05,ENTRY_A],[ENTRY_B,ENTRY_B+0.05],[ENTRY_C,ENTRY_C+0.05]])
-  G_PART.add(slab(-SHELL.WALL_T, 0, p[0], p[1], 0, SHELL.DOOR_H+0.12, MAT.frame,
-                  { collide:false }));
-G_PART.add(slab(-0.09,-0.06, ENTRY_B, ENTRY_C, 0, SHELL.DOOR_H+0.12, MAT.glassIn,
-                { cast:false, name:'entry_sidelight', kind:'shell' }));
-G_PART.add(slab(-SHELL.WALL_T, 0, ENTRY_B, ENTRY_C, SHELL.DOOR_H+0.12, CH, MAT.wall,
-                { collide:false }));
-// The corridor beyond, glimpsed through the opening. Walk mode only — in top
-// and orbit it is just a slab of nothing sitting outside the parcel.
-G_CONTEXT.add(slab(-2.4, -SHELL.WALL_T, 2.2, 6.9, 0, CH, MAT.wallSide,
+/* --- 3c. Entrance wall (x = 0) -------------------------------------------
+   Solid, with two 900 x 2100 fire doors — one in each corner, as measured.
+   The lift lobby and stairs are beyond it. ---------------------------------*/
+solidWall({ along:'y', at:-SHELL.WALL_T, t:SHELL.WALL_T,
+            from:-SHELL.WALL_T, to:D+SHELL.WALL_T,
+            name:'entrance_wall', skirt:true,
+            holes: SURVEY.DOORS.map(d => ({ a:d.a, b:d.b, head:SHELL.DOOR_H })) });
+// dark fire-door leaves, held open as apertures you can walk through
+for (const d of SURVEY.DOORS){
+  G_PART.add(slab(-SHELL.WALL_T-0.045, -SHELL.WALL_T-0.005, d.a, d.b, 0, SHELL.DOOR_H,
+                  MAT.fireDoor, { collide:false, name:'fire_door' }));
+  for (const p of [[d.a-0.05, d.a],[d.b, d.b+0.05]])
+    G_PART.add(slab(-SHELL.WALL_T, 0.004, p[0], p[1], 0, SHELL.DOOR_H+0.06, MAT.frame,
+                    { collide:false }));
+  G_PART.add(slab(-SHELL.WALL_T, 0.004, d.a-0.05, d.b+0.05,
+                  SHELL.DOOR_H, SHELL.DOOR_H+0.06, MAT.frame, { collide:false }));
+}
+// the corridor beyond, glimpsed through an open door
+G_CONTEXT.add(slab(-2.4, -SHELL.WALL_T, -0.4, D+0.4, 0, CH, MAT.wallSide,
                    { collide:false, cast:false }));
-G_CONTEXT.add(plane(-2.4, -SHELL.WALL_T, 2.2, 6.9, 0.002, MAT.floorCarp));
-G_CONTEXT.add(slab(-2.4, -2.36, 2.2, 6.9, 0, CH, MAT.navy, { collide:false, cast:false }));
+G_CONTEXT.add(plane(-2.4, -SHELL.WALL_T, -0.4, D+0.4, 0.002, MAT.floorCarp));
 
-/* --- 3d. Demising walls (y = 0 and y = 9.1) ------------------------------
-   Shared with parcels 71 and 69. Solid, acoustically rated, no openings. ----*/
+/* --- 3d. Flank walls (y = 0 and y = 8.839) -------------------------------
+   Solid, shared with the neighbouring suites. No openings. -----------------*/
 solidWall({ along:'x', at:-SHELL.WALL_T, t:SHELL.WALL_T, from:-SHELL.WALL_T, to:W,
-            name:'demising_71', skirt:true });
+            name:'flank_south', skirt:true });
 solidWall({ along:'x', at:D, t:SHELL.WALL_T, from:-SHELL.WALL_T, to:W,
-            name:'demising_69', skirt:true });
+            name:'flank_north', skirt:true });
 
-/* --- 3e. Curtain wall (x = 10.3) ----------------------------------------
-   Floor-to-ceiling glazing on a 1.5 m mullion grid. 9.1 m of frontage gives
-   six full 1.5 m bays plus a 100 mm closer panel at the party wall. --------*/
-const MULLIONS = [];
-for (let y = 0; y <= D + 1e-6; y += SURVEY.MULLION_PITCH) MULLIONS.push(+y.toFixed(3));
-if (MULLIONS[MULLIONS.length-1] < D - 1e-6) MULLIONS.push(D);
-
-const cwX = W, mW = SHELL.MULLION_W;
-// glass leaf, one continuous pane per bay
-for (let i=0;i<MULLIONS.length-1;i++){
-  const a = MULLIONS[i], b = MULLIONS[i+1];
-  G_SHELL.add(slab(cwX-0.012, cwX+0.012, a, b, 0, CH, MAT.glassOut,
-                   { cast:false, name:'curtain_glass', kind:'shell' }));
+/* --- 3e. Window wall (x = 10.008) ----------------------------------------
+   NOT a curtain wall. A solid facade with punched openings 1651 x 1524 on a
+   750 sill, head at 2274 — 126 mm below the ceiling, which is what the photos
+   show. This is the single biggest correction to the brief: the fit-out can no
+   longer rely on a glazed wall for daylight. -------------------------------*/
+const SILL = SURVEY.WIN_SILL, WHEAD = SILL + SURVEY.WIN_H;
+solidWall({ along:'y', at:W, t:SHELL.WALL_T, from:-SHELL.WALL_T, to:D+SHELL.WALL_T,
+            name:'window_wall', skirt:true,
+            holes: SURVEY.WIN_AT.map(a => ({ a, b:a + SURVEY.WIN_W, head:WHEAD })) });
+for (const a of SURVEY.WIN_AT){
+  const b = a + SURVEY.WIN_W;
+  // sill wall below the opening, and the reveal
+  G_SHELL.add(slab(W, W+SHELL.WALL_T, a, b, 0, SILL, MAT.wall, { name:'window_sill_wall',
+                                                                 kind:'shell' }));
+  G_SHELL.add(slab(W-0.012, W+0.012, a, b, SILL, WHEAD, MAT.glassOut,
+                   { cast:false, collide:false, name:'window_glass' }));
+  G_SHELL.add(slab(W-0.03, W+SHELL.WALL_T, a-0.03, a, 0, WHEAD+0.05, MAT.wall, { collide:false }));
+  G_SHELL.add(slab(W-0.03, W+SHELL.WALL_T, b, b+0.03, 0, WHEAD+0.05, MAT.wall, { collide:false }));
+  G_SHELL.add(slab(W-0.05, W+0.02, a, b, SILL-0.035, SILL, MAT.lam, { collide:false })); // cill
+  G_SHELL.add(slab(W-0.05, W+0.02, a, b, WHEAD, WHEAD+0.035, MAT.frame, { collide:false }));
+  for (const e of [a, b])                                               // frame jambs
+    G_SHELL.add(slab(W-0.04, W+0.01, e-0.025, e+0.025, SILL, WHEAD, MAT.frame,
+                     { collide:false }));
 }
-// mullions, transom at head, and the base track
-for (const y of MULLIONS)
-  G_SHELL.add(slab(cwX-0.05, cwX+0.03, y-mW/2, y+mW/2, 0, CH, MAT.frame, { collide:false }));
-G_SHELL.add(slab(cwX-0.05, cwX+0.03, 0, D, CH-0.07, CH, MAT.frame, { collide:false }));
-G_SHELL.add(slab(cwX-0.06, cwX+0.03, 0, D, 0, 0.07, MAT.frame, { collide:false }));
-// a solid barrier so you cannot walk out of the building
-addCollider(cwX-0.06, cwX+0.05, -0.2, D+0.2, 0, CH, 'curtain_wall', 'shell');
+addCollider(W-0.05, W+SHELL.WALL_T, -0.2, D+0.2, 0, CH, 'window_wall', 'shell');
 
-// roller blinds, half raised
-for (let i=0;i<MULLIONS.length-1;i++){
-  const a = MULLIONS[i]+0.03, b = MULLIONS[i+1]-0.03;
-  if (b - a < 0.25) continue;
-  G_SHELL.add(slab(cwX-0.115, cwX-0.10, a, b, SHELL.BLIND_BOTTOM, SHELL.BLIND_TOP,
-                   MAT.blind, { collide:false, cast:false }));
-  G_SHELL.add(slab(cwX-0.15, cwX-0.07, a, b, SHELL.BLIND_TOP, SHELL.BLIND_TOP+0.10,
-                   MAT.lam, { collide:false }));      // blind box
-  G_SHELL.add(slab(cwX-0.125, cwX-0.09, a, b, SHELL.BLIND_BOTTOM-0.03, SHELL.BLIND_BOTTOM,
-                   MAT.lam, { collide:false }));      // bottom bar
-}
-
-/* --- 3f. Structural column (600 x 600 at 7.2, 4.6) -----------------------
-   Surveyed. Everything else is laid out around it. -------------------------*/
+/* --- 3f. Structural column (round, ~650 dia at 6.43, 5.44) ---------------
+   The notebook draws it as a circle and the photos confirm it: a plastered
+   round column, not the 600 square the brief described. --------------------*/
 const COL = SURVEY.COLUMN;
-const COL_X0 = COL.cx - COL.size/2, COL_X1 = COL.cx + COL.size/2;
-const COL_Y0 = COL.cy - COL.size/2, COL_Y1 = COL.cy + COL.size/2;
-G_SHELL.add(slab(COL_X0, COL_X1, COL_Y0, COL_Y1, 0, CH, MAT.wall,
-                 { name:'column', kind:'shell' }));
-// navy base wrap + brass reveal, so it reads as a designed element
-G_SHELL.add(slab(COL_X0-0.012, COL_X1+0.012, COL_Y0-0.012, COL_Y1+0.012, 0, 0.55,
-                 MAT.navy, { collide:false }));
-G_SHELL.add(slab(COL_X0-0.016, COL_X1+0.016, COL_Y0-0.016, COL_Y1+0.016, 0.55, 0.565,
-                 MAT.brass, { collide:false }));
+G_SHELL.add(post(COL.cx, COL.cy, 0, CH, COL.r, COL.r, MAT.wall, 28));
+addCollider(COL.cx-COL.r, COL.cx+COL.r, COL.cy-COL.r, COL.cy+COL.r, 0, CH,
+            'column', 'shell');
 
-/* --- 3g. Ceiling and the FCU bulkhead ------------------------------------ */
-G_CEILING.add(plane(-0.02, W+0.02, -0.02, D+0.02, CH, MAT.ceiling, true));
-// 400 mm deep, 1.0 m wide bulkhead along the corridor wall, carrying the FCU
-// cast:false — with the sun overhead the box would shadow its own soffit, which
-// reads as a dirty brown band rather than the warm white plasterboard it is.
-G_CEILING.add(slab(0, SHELL.BULKHEAD_W, 0, D, CH-SHELL.BULKHEAD_DROP, CH, MAT.ceiling,
-                   { collide:false, cast:false }));
-// 'fixture', not 'shell': it sits at 2.40–2.80 in the ceiling void, so it is
-// never in a walker's way and a partition running under it is a junction, not
-// a clash. Marking it shell made every partition on the corridor side foul it.
-addCollider(0, SHELL.BULKHEAD_W, 0, D, CH-SHELL.BULKHEAD_DROP, CH, 'fcu_bulkhead', 'fixture');
-G_CEILING.add(slab(SHELL.BULKHEAD_W, SHELL.BULKHEAD_W+0.012, 0, D,
-                   CH-SHELL.BULKHEAD_DROP, CH-SHELL.BULKHEAD_DROP+0.012, MAT.brass,
-                   { collide:false }));
-// linear supply grille on the bulkhead face
-G_CEILING.add(slab(SHELL.BULKHEAD_W-0.004, SHELL.BULKHEAD_W+0.004, 1.1, 8.0,
-                   CH-0.30, CH-0.12, MAT.lamDk, { collide:false }));
+/* --- 3g. Suspended ceiling (2.40 m) --------------------------------------
+   600 x 600 mineral tile on an exposed tee grid, as found. -----------------*/
+G_CEILING.add(plane(-0.02, W+0.02, -0.02, D+0.02, CH, MAT.ceilTile, true));
+(function ceilingGrid(){
+  const t = 0.016, g = 0.60;
+  for (let x = 0; x <= W + 1e-6; x += g)
+    G_CEILING.add(slab(x-t/2, x+t/2, 0, D, CH-0.012, CH-0.002, MAT.grid,
+                       { collide:false, cast:false }));
+  for (let y = 0; y <= D + 1e-6; y += g)
+    G_CEILING.add(slab(0, W, y-t/2, y+t/2, CH-0.012, CH-0.002, MAT.grid,
+                       { collide:false, cast:false }));
+})();
 
 /* --- 3h. Johor Bahru, twenty floors down --------------------------------- */
 (function city(){
@@ -1056,9 +1067,9 @@ G_CEILING.add(slab(SHELL.BULKHEAD_W-0.004, SHELL.BULKHEAD_W+0.004, 1.1, 8.0,
   // the doll's house reads as level 20 of a city block from every orbit angle.
   for (let i=0;i<86;i++){
     const bw = 8 + rnd()*26, bd = 8 + rnd()*26;
-    const top = GROUND + 6 + rnd()*rnd()*64;   // few neighbours reach level 20
+    const top = GROUND + 6 + rnd()*(i % 3 === 0 ? 82 : 58);  // some rise past us
     const a  = rnd()*Math.PI*2;
-    const rr = 42 + rnd()*rnd()*150;           // none crowd the parcel itself
+    const rr = 26 + rnd()*rnd()*150;    // the facing tower is close, per the photos
     const x = W/2 + Math.cos(a)*rr;
     const y = D/2 + Math.sin(a)*rr;
     const m = new THREE.Mesh(geo, MAT.city);
@@ -2001,7 +2012,10 @@ function wallPier(len){
   // 620 mm deep rather than 700, and the transaction shelf steps up *within*
   // the footprint instead of oversailing it, so the counter face lands exactly
   // on y = 3.75 and the 1.5 m entrance spine stays 1.5 m wide past reception.
-  const x0=1.25, x1=3.00, y0=3.13, y1=3.75, h=0.750;
+  // Re-set for the measured shell: the counter backs onto the store line at
+  // y = 4.055 with a 700 staff zone behind it, and faces the main fire door in
+  // the corner at y = 0.80.
+  const x0=1.60, x1=3.05, y0=2.69, y1=3.31, h=0.750;
   G_FURN.add(slab(x0, x1, y0, y1, 0.060, h, MAT.navy, { name:'reception_desk' }));
   G_FURN.add(slab(x0+0.04, x1-0.04, y0+0.04, y1-0.04, 0, 0.060, MAT.lamDk, { collide:false }));
   G_FURN.add(slab(x0-0.02, x1+0.02, y0-0.02, y1, h, h+0.032, MAT.oak, { collide:false }));
@@ -2014,35 +2028,35 @@ function wallPier(len){
   addCollider(x0-0.05, x1+0.05, y0-0.02, y1, 0, 1.095, 'reception_counter', 'fixture');
   // desktop kit. The monitor faces the visitor side (local -Y, so deg 0) —
   // it was previously placed at 180 and showed the receptionist its back.
-  place(monitor(0.520,0.310), 2.05, 3.36, 0);
-  G_FURN.add(slab(1.42, 1.58, 3.28, 3.44, h+0.032, h+0.062, MAT.lamDk, { collide:false })); // phone
-  place(deskPlant(), 2.78, 3.34, 0);
+  place(monitor(0.520,0.310), 2.30, 2.92, 0);
+  G_FURN.add(slab(1.75, 1.91, 2.84, 3.00, h+0.032, h+0.062, MAT.lamDk, { collide:false })); // phone
+  place(deskPlant(), 2.90, 2.90, 0);
   // entrance mat
-  G_FURN.add(plane(0.02, 1.10, ENTRY_A+0.06, ENTRY_C-0.66, 0.010, MAT.fabricDk));
+  G_FURN.add(plane(0.02, 1.00, SURVEY.DOORS[0].a, SURVEY.DOORS[0].b, 0.010, MAT.fabricDk));
 })();
 
 /* ---- Pantry nook: fixed joinery only ------------------------------------ */
 (function pantry(){
-  const cy1 = D, cy0 = D - DIM.COUNTER_D, h = DIM.COUNTER_H;
-  G_FURN.add(slab(0.10, 2.90, cy0, cy1, 0.090, h-0.035, MAT.lam,
+  const cy1 = D, cy0 = D - DIM.COUNTER_D, h = DIM.COUNTER_H, PX0 = 2.10, PX1 = 4.15;
+  G_FURN.add(slab(PX0, PX1, cy0, cy1, 0.090, h-0.035, MAT.lam,
                   { name:'pantry_counter', kind:'fixture' }));
-  G_FURN.add(slab(0.14, 2.86, cy0+0.06, cy1, 0, 0.090, MAT.lamDk, { collide:false }));
+  G_FURN.add(slab(PX0+0.04, PX1-0.04, cy0+0.06, cy1, 0, 0.090, MAT.lamDk, { collide:false }));
   // Worktop, built as four strips around the sink cut-out — a single slab would
   // bury the basin under it.
-  const sx0=0.72, sx1=1.26, sy0=cy0+0.11, sy1=cy1-0.09, wt0=cy0-0.030;
-  G_FURN.add(slab(0.06, sx0, wt0, cy1, h-0.035, h, MAT.walnut, { collide:false }));
-  G_FURN.add(slab(sx1, 2.94, wt0, cy1, h-0.035, h, MAT.walnut, { collide:false }));
+  const sx0=PX0+0.50, sx1=PX0+1.04, sy0=cy0+0.11, sy1=cy1-0.09, wt0=cy0-0.030;
+  G_FURN.add(slab(PX0-0.04, sx0, wt0, cy1, h-0.035, h, MAT.walnut, { collide:false }));
+  G_FURN.add(slab(sx1, PX1+0.04, wt0, cy1, h-0.035, h, MAT.walnut, { collide:false }));
   G_FURN.add(slab(sx0, sx1, wt0, sy0, h-0.035, h, MAT.walnut, { collide:false }));
   G_FURN.add(slab(sx0, sx1, sy1, cy1, h-0.035, h, MAT.walnut, { collide:false }));
   // cabinet door lines + brass pulls
   for (let i=0;i<5;i++){
-    const x = 0.12 + i*0.556;
-    G_FURN.add(slab(x, x+0.540, cy0-0.012, cy0-0.004, 0.095, h-0.045, MAT.lam, { collide:false }));
-    G_FURN.add(slab(x+0.24, x+0.30, cy0-0.024, cy0-0.010, h-0.13, h-0.11, MAT.brass, { collide:false }));
+    const x = PX0 + 0.02 + i*0.402;
+    G_FURN.add(slab(x, x+0.386, cy0-0.012, cy0-0.004, 0.095, h-0.045, MAT.lam, { collide:false }));
+    G_FURN.add(slab(x+0.17, x+0.22, cy0-0.024, cy0-0.010, h-0.13, h-0.11, MAT.brass, { collide:false }));
   }
   // under-counter fridge, expressed as a steel door panel
-  G_FURN.add(slab(2.16, 2.86, cy0-0.020, cy0-0.006, 0.095, h-0.045, MAT.steel, { collide:false }));
-  G_FURN.add(slab(2.19, 2.24, cy0-0.032, cy0-0.018, 0.30, 0.66, MAT.brass, { collide:false }));
+  G_FURN.add(slab(PX1-0.70, PX1-0.04, cy0-0.020, cy0-0.006, 0.095, h-0.045, MAT.steel, { collide:false }));
+  G_FURN.add(slab(PX1-0.67, PX1-0.62, cy0-0.032, cy0-0.018, 0.30, 0.66, MAT.brass, { collide:false }));
   // stainless basin dropped into the cut-out: bottom, four sides, and a rim
   G_FURN.add(slab(sx0, sx1, sy0, sy1, h-0.175, h-0.160, MAT.steel, { collide:false }));
   G_FURN.add(slab(sx0, sx0+0.014, sy0, sy1, h-0.175, h, MAT.steel, { collide:false }));
@@ -2052,37 +2066,31 @@ function wallPier(len){
   G_FURN.add(slab(sx0-0.012, sx1+0.012, sy0-0.012, sy1+0.012, h, h+0.006, MAT.steel,
                   { collide:false }));
   G_FURN.add(post((sx0+sx1)/2, (sy0+sy1)/2, h-0.160, h-0.150, 0.030, 0.030, MAT.lamDk, 12));
-  G_FURN.add(post(0.99, cy1-0.14, h, h+0.055, 0.028, 0.028, MAT.brass, 12));
-  G_FURN.add(post(0.99, cy1-0.30, h+0.230, h+0.275, 0.019, 0.019, MAT.brass, 12));
-  G_FURN.add(post(0.99, cy1-0.14, h+0.055, h+0.275, 0.019, 0.019, MAT.brass, 12));
-  G_FURN.add(slab(0.975, 1.005, cy1-0.30, cy1-0.14, h+0.255, h+0.275, MAT.brass, { collide:false }));
+  G_FURN.add(post(PX0+0.77, cy1-0.14, h, h+0.055, 0.028, 0.028, MAT.brass, 12));
+  G_FURN.add(post(PX0+0.77, cy1-0.30, h+0.230, h+0.275, 0.019, 0.019, MAT.brass, 12));
+  G_FURN.add(post(PX0+0.77, cy1-0.14, h+0.055, h+0.275, 0.019, 0.019, MAT.brass, 12));
+  G_FURN.add(slab(PX0+0.755, PX0+0.785, cy1-0.30, cy1-0.14, h+0.255, h+0.275, MAT.brass, { collide:false }));
   // upper cabinets — high-level joinery, so they live in G_ABOVE and drop out
   // of the plan view rather than hiding the counter below them
-  G_ABOVE.add(slab(0.10, 2.50, cy1-0.350, cy1, 1.500, 2.200, MAT.lam,
+  G_ABOVE.add(slab(PX0, PX1-0.35, cy1-0.350, cy1, 1.500, 2.200, MAT.lam,
                    { name:'pantry_uppers', kind:'fixture' }));
   for (let i=0;i<4;i++){
-    const x = 0.13 + i*0.590;
-    G_ABOVE.add(slab(x, x+0.565, cy1-0.362, cy1-0.352, 1.512, 2.188, MAT.walnut, { collide:false }));
-    G_ABOVE.add(slab(x+0.25, x+0.32, cy1-0.374, cy1-0.360, 1.545, 1.565, MAT.brass, { collide:false }));
+    const x = PX0 + 0.03 + i*0.415;
+    G_ABOVE.add(slab(x, x+0.395, cy1-0.362, cy1-0.352, 1.512, 2.188, MAT.walnut, { collide:false }));
+    G_ABOVE.add(slab(x+0.17, x+0.24, cy1-0.374, cy1-0.360, 1.545, 1.565, MAT.brass, { collide:false }));
   }
   // coffee machine + mugs
-  place(coffeeMachine(), 1.90, cy0+0.30, 180, null);
+  place(coffeeMachine(), PX0+1.55, cy0+0.30, 180, null);
   for (let i=0;i<3;i++)
-    G_FURN.add(post(1.44+i*0.10, cy0+0.44, h, h+0.085, 0.038, 0.038, MAT.lam, 12));
+    G_FURN.add(post(PX0+1.05+i*0.10, cy0+0.44, h, h+0.085, 0.038, 0.038, MAT.lam, 12));
   // narrow standing ledge against the corridor wall
-  G_FURN.add(slab(0.02, 0.42, 7.40, 8.60, 1.020, 1.058, MAT.walnut,
+  G_FURN.add(slab(PX0-0.06, PX0+0.06, 6.75, 8.30, 1.020, 1.058, MAT.walnut,
                   { name:'pantry_ledge', kind:'fixture' }));
-  for (const y of [7.60, 8.40])
-    G_FURN.add(slab(0.04, 0.30, y-0.020, y+0.020, 0.900, 1.020, MAT.brass, { collide:false }));
+  for (const y of [7.10, 7.95])
+    G_FURN.add(slab(PX0-0.04, PX0+0.04, y-0.020, y+0.020, 0.900, 1.020, MAT.brass, { collide:false }));
 })();
 
-/* ---- Flex bay: the touchdown ledge is built in; the booth is not -------- */
-(function flexFixed(){
-  G_FURN.add(slab(4.60, 6.00, 0.02, 0.44, 1.020, 1.058, MAT.oak,
-                  { name:'touchdown_ledge', kind:'fixture' }));
-  for (const x of [4.72, 5.88])
-    G_FURN.add(slab(x-0.020, x+0.020, 0.06, 0.40, 0.020, 1.020, MAT.frame, { collide:false }));
-})();
+
 
 /* ---- Open workstations --------------------------------------------------
    Two benches of three 1150 mm sit-stand desks facing each other across a
@@ -2207,104 +2215,101 @@ const CATALOG = {
    This is the layout the walkthrough opens with and the one "Reset" returns
    to. Editing never touches it; edits live in localStorage. ---------------- */
 const DEFAULT_LAYOUT = [
-  // ---- demountable partitions, as designed -------------------------------
-  // store: solid back-of-house box on the corridor wall
-  { type:'wall_solid',        x:1.5225, y:2.300,  rot:0,  len:3.045, door:0.197 },
-  { type:'wall_solid',        x:3.000,  y:1.1275, rot:90, len:2.255 },
-  { type:'wall_feature',      x:2.075,  y:2.322,  rot:0,  len:1.850 },
-  // pantry nook: a short return, then a solid flank
-  { type:'wall_solid',        x:0.650,  y:7.000,  rot:0,  len:1.300 },
-  { type:'wall_solid',        x:3.000,  y:8.0275, rot:90, len:2.145 },
-  // meeting room: glazed, solid AV pier, glazed, door in the corner
-  { type:'wall_glazed',       x:6.700,  y:0.650,  rot:90, len:1.300 },
-  { type:'wall_pier',         x:6.700,  y:1.950,  rot:90, len:1.300 },
-  { type:'wall_glazed',       x:6.700,  y:3.250,  rot:90, len:1.300, door:0.654 },
-  // these two stop at the curtain wall's inner framing (x = 10.235) rather
-  // than the glass line, so they abut the facade instead of overlapping it
-  { type:'wall_glazed',       x:8.445,  y:3.900,  rot:0,  len:3.580 },
-  // director's office: glazed with a frosted band at seated height
-  { type:'wall_glazed_frost', x:8.445,  y:6.250,  rot:0,  len:3.580, door:0.180 },
-  { type:'wall_glazed_frost', x:6.700,  y:7.6525, rot:90, len:2.895 },
-  // reception & waiting
-  { type:'task_chair',    x:2.10, y:2.76, rot:0   },
-  { type:'sofa2',         x:0.45, y:6.15, rot:270 },
-  { type:'armchair',      x:2.15, y:6.50, rot:215 },
-  { type:'coffee_table',  x:1.50, y:5.78, rot:0   },
-  { type:'planter_tall',  x:2.78, y:5.62, rot:0   },
-  // document & compliance store
-  { type:'file_cabinet',  x:0.300, y:0.335, rot:0 },
-  { type:'file_cabinet',  x:0.795, y:0.335, rot:0 },
-  { type:'file_cabinet',  x:1.290, y:0.335, rot:0 },
-  { type:'file_cabinet',  x:1.785, y:0.335, rot:0 },
-  { type:'shelving_wide', x:2.775, y:1.500, rot:90 },
-  { type:'printer',       x:2.420, y:0.360, rot:0 },
-  { type:'shredder',      x:1.620, y:1.980, rot:0 },
-  // pantry
-  { type:'stool',         x:0.72, y:7.66, rot:90 },
-  { type:'stool',         x:0.72, y:8.34, rot:90 },
-  // flex bay
-  { type:'phone_booth',   x:3.75, y:3.05, rot:0   },
-  { type:'stool',         x:4.95, y:0.76, rot:180 },
-  { type:'stool',         x:5.65, y:0.76, rot:180 },
-  { type:'planter_lg',    x:4.88, y:3.28, rot:0   },
-  { type:'planter_sm',    x:6.28, y:0.58, rot:0   },
-  // open workstations: two benches of three across a 350 mm screen
-  { type:'workstation',   x:3.675, y:6.525, rot:0 },
-  { type:'workstation',   x:4.825, y:6.525, rot:0 },
-  { type:'workstation',   x:5.975, y:6.525, rot:0 },
-  { type:'workstation',     x:3.675, y:7.275, rot:180 },
-  { type:'workstation_std', x:4.825, y:7.275, rot:180 },
-  { type:'workstation',     x:5.975, y:7.275, rot:180 },
-  { type:'screen_345',    x:4.825, y:6.900, rot:0 },
-  { type:'pedestal',      x:3.995, y:6.545, rot:0 },
-  { type:'pedestal',      x:5.145, y:6.545, rot:0 },
-  { type:'pedestal',      x:6.295, y:6.545, rot:0 },
-  { type:'pedestal',      x:3.995, y:7.285, rot:0 },
-  { type:'pedestal',      x:5.145, y:7.285, rot:0 },
-  { type:'pedestal',      x:6.295, y:7.285, rot:0 },
-  { type:'task_chair',    x:3.675, y:5.80, rot:0 },
-  { type:'task_chair_dk', x:4.825, y:5.80, rot:0 },
-  { type:'task_chair',    x:5.975, y:5.80, rot:0 },
-  { type:'task_chair',    x:3.675, y:8.00, rot:180 },
-  { type:'task_chair_dk', x:4.825, y:8.00, rot:180 },
-  { type:'task_chair',    x:5.975, y:8.00, rot:180 },
-  { type:'desk_plant',    x:4.115, y:6.760, rot:0 },
-  { type:'desk_plant',    x:6.415, y:6.760, rot:0 },
-  { type:'laptop',        x:3.675, y:6.360, rot:0 },
-  // client meeting room
-  { type:'conf_table',    x:8.55, y:1.95, rot:0 },
-  { type:'conf_chair',    x:7.75, y:0.90, rot:0 },
-  { type:'conf_chair',    x:8.55, y:0.90, rot:0 },
-  { type:'conf_chair',    x:9.35, y:0.90, rot:0 },
-  { type:'conf_chair',    x:7.75, y:3.00, rot:180 },
-  { type:'conf_chair',    x:8.55, y:3.00, rot:180 },
-  { type:'conf_chair',    x:9.35, y:3.00, rot:180 },
-  { type:'credenza',      x:8.90, y:3.605, rot:180 },
-  { type:'desk_plant',    x:9.36, y:3.600, rot:0, z:0.720 },
-  // director's office
-  { type:'exec_desk',     x:8.15, y:7.60, rot:270 },
-  { type:'exec_chair',    x:7.30, y:7.60, rot:270 },
-  { type:'conf_chair_lt', x:9.15, y:7.15, rot:90  },
-  { type:'conf_chair_lt', x:9.15, y:8.05, rot:90  },
-  { type:'shelving',      x:8.90, y:8.870, rot:0  },
-  { type:'side_table',    x:9.80, y:6.620, rot:0  },
-  // window breakout
-  { type:'round_table',   x:9.40, y:5.10, rot:0   },
-  { type:'conf_chair_lt', x:9.40, y:4.42, rot:0   },
-  { type:'conf_chair_lt', x:9.40, y:5.78, rot:180 },
-  { type:'planter_md',    x:8.00, y:5.720, rot:0  },
+  /* ---- partitions ------------------------------------------------------
+     Re-planned into the measured shell. The window wall is now solid with
+     four punched openings, so the enclosed rooms are pushed to the two ends
+     of it and each takes a window; the middle opening is left to the
+     breakout so the open floor still gets daylight.                        */
+  // reception / store: solid back-of-house line, door at the reception end
+  { type:'wall_solid',        x:1.550, y:4.100, rot:0,  len:3.100, door:0.80 },
+  { type:'wall_feature',      x:1.700, y:4.055, rot:0,  len:1.900 },
+  // store / back lobby / pantry
+  { type:'wall_solid',        x:3.100, y:5.350, rot:90, len:2.500 },
+  { type:'wall_solid',        x:2.000, y:7.720, rot:90, len:2.239 },
+  { type:'wall_solid',        x:2.975, y:6.600, rot:0,  len:1.950 },
+  // meeting room: glazed, AV pier, glazed with the door at the spine end
+  { type:'wall_glazed',       x:6.500, y:0.750, rot:90, len:1.500 },
+  { type:'wall_pier',         x:6.500, y:2.050, rot:90, len:1.100 },
+  { type:'wall_glazed',       x:6.500, y:3.100, rot:90, len:1.000 },
+  { type:'wall_glazed',       x:8.2225,y:3.600, rot:0,  len:3.400, door:0.16 },
+  // director's office, frosted band at seated height
+  { type:'wall_glazed_frost', x:8.2225,y:6.000, rot:0,  len:3.400, door:0.20 },
+  { type:'wall_glazed_frost', x:6.500, y:7.415, rot:90, len:2.830 },
+
+  /* ---- reception & waiting, at the main door -------------------------- */
+  { type:'task_chair',    x:2.30,  y:3.66, rot:180 },
+  { type:'sofa2',         x:0.48,  y:2.75, rot:270 },
+  { type:'coffee_table',  x:1.20,  y:2.90, rot:90  },
+  { type:'planter_tall',  x:2.80,  y:1.95, rot:0   },
+  { type:'brochure_rack', x:2.80,  y:3.70, rot:90  },
+  { type:'coat_stand',    x:0.35,  y:3.80, rot:0   },
+
+  /* ---- document & compliance store ------------------------------------ */
+  { type:'file_cabinet',  x:0.300, y:4.60, rot:0 },
+  { type:'file_cabinet',  x:0.795, y:4.60, rot:0 },
+  { type:'file_cabinet',  x:1.290, y:4.60, rot:0 },
+  { type:'file_cabinet',  x:1.785, y:4.60, rot:0 },
+  { type:'safe',          x:2.55,  y:4.62, rot:0 },
+  { type:'shelving_wide', x:2.80,  y:5.85, rot:90 },
+  { type:'printer_mfd',   x:0.50,  y:6.20, rot:180 },
+  { type:'shredder',      x:1.20,  y:6.30, rot:180 },
+
+  /* ---- pantry nook ----------------------------------------------------- */
+  { type:'stool',         x:2.42,  y:7.30, rot:90 },
+  { type:'stool',         x:2.42,  y:7.90, rot:90 },
+  { type:'bins',          x:3.70,  y:8.55, rot:180 },
+  { type:'water_cooler',  x:2.25,  y:6.90, rot:0 },
+
+  /* ---- flex bay: booth, touchdown, planting --------------------------- */
+  { type:'phone_booth',   x:3.90,  y:2.95, rot:180 },
+  { type:'plant_tree',    x:3.70,  y:4.60, rot:0   },
+  { type:'planter_sm',    x:5.85,  y:5.60, rot:0   },
+
+  /* ---- open workstations: two benches of three ------------------------ */
+  { type:'workstation',     x:4.375, y:5.825, rot:270 },
+  { type:'workstation',     x:4.375, y:6.975, rot:270 },
+  { type:'workstation_std', x:4.375, y:8.125, rot:270 },
+  { type:'workstation',     x:5.125, y:6.975, rot:90  },
+  { type:'workstation',     x:5.125, y:8.125, rot:90  },
+  { type:'screen_345',      x:4.750, y:6.975, rot:90  },
+  { type:'pedestal',      x:4.200, y:5.510, rot:0 },
+  { type:'pedestal',      x:4.200, y:6.660, rot:0 },
+  { type:'pedestal',      x:4.200, y:7.810, rot:0 },
+  { type:'pedestal',      x:5.300, y:6.660, rot:0 },
+  { type:'pedestal',      x:5.300, y:7.810, rot:0 },
+  { type:'task_chair',    x:3.550, y:5.825, rot:270 },
+  { type:'task_chair_dk', x:3.550, y:6.975, rot:270 },
+  { type:'task_chair',    x:3.550, y:8.125, rot:270 },
+  { type:'task_chair_dk', x:5.950, y:6.975, rot:90  },
+  { type:'task_chair',    x:5.950, y:8.125, rot:90  },
+
+  /* ---- client meeting room --------------------------------------------- */
+  { type:'conf_table',    x:8.35,  y:1.80, rot:0 },
+  { type:'conf_chair',    x:7.60,  y:0.85, rot:0 },
+  { type:'conf_chair',    x:8.35,  y:0.85, rot:0 },
+  { type:'conf_chair',    x:9.10,  y:0.85, rot:0 },
+  { type:'conf_chair',    x:7.60,  y:2.75, rot:180 },
+  { type:'conf_chair',    x:8.35,  y:2.75, rot:180 },
+  { type:'conf_chair',    x:9.10,  y:2.75, rot:180 },
+  { type:'credenza',      x:8.55,  y:3.32, rot:180 },
+  { type:'desk_plant',    x:9.45,  y:3.32, rot:0, z:0.720 },
+
+  /* ---- director's office ----------------------------------------------- */
+  { type:'exec_desk',     x:8.10,  y:7.35, rot:270 },
+  { type:'exec_chair',    x:7.25,  y:7.35, rot:270 },
+  { type:'conf_chair_lt', x:9.05,  y:6.95, rot:90  },
+  { type:'conf_chair_lt', x:9.05,  y:7.80, rot:90  },
+  { type:'bookcase',      x:8.60,  y:8.62, rot:0   },
+  { type:'side_table',    x:9.55,  y:6.40, rot:0   },
+
+  /* ---- window breakout -------------------------------------------------- */
+  { type:'round_table',   x:9.15,  y:4.80, rot:0   },
+  { type:'conf_chair_lt', x:9.15,  y:4.12, rot:0   },
+  { type:'conf_chair_lt', x:9.15,  y:5.48, rot:180 },
+  { type:'planter_md',    x:7.30,  y:5.60, rot:0   },
 ];
 
-/* ---- Meeting room AV: bracketed to the solid pier, so it stays fixed ---- */
-(function meetingAV(){
-  const px = 6.70 + HPT;
-  G_FURN.add(slab(px+0.008, px+0.062, 1.340, 2.560, 1.030, 1.720, MAT.frame,
-                  { collide:false }));
-  G_FURN.add(slab(px+0.062, px+0.070, 1.360, 2.540, 1.050, 1.700, MAT.screenOff,
-                  { collide:false }));
-  G_FURN.add(slab(px+0.010, px+0.080, 1.560, 2.340, 0.900, 0.968, MAT.lamDk,
-                  { collide:false }));
-})();
+
 
 /* ==========================================================================
    5c. LAYOUT ENGINE — turns the layout array into scene objects, keeps the
@@ -2618,48 +2623,47 @@ function downlight(x, y, intensity = LIGHT.DOWN_INT){
   G_LIGHT.add(L);
 }
 
-/* --- 6b. Layout ---------------------------------------------------------- */
-// linear runs over the two desk benches
-linearLight(3.15, 6.50, BENCH_S.top0 + 0.20);
-linearLight(3.15, 6.50, BENCH_N.top1 - 0.20);
-// linear run down the entrance spine
-linearLight(1.30, 6.40, 4.50, 0.065, 2.6);
+/* --- 6b. Layout ----------------------------------------------------------
+   At 2.40 m there is no room for the pendants the brief asked for — a 1.05 m
+   drop would leave the shade at 1.35 m, below standing eye height. So the
+   scheme is recessed into the 600 grid, with short 0.45 m drops only over the
+   two places you sit down: the reception counter and the breakout table.
+   Daylight is now four punched windows rather than a glazed wall, so the deep
+   plan needs more artificial light than it did, not less. ------------------*/
+const PEND_DROP = 0.45;
 
-// wall-washers grazing the slatted feature wall, so it reads as the backdrop
-// the reception desk was designed against rather than a dark plane
-for (const x of [1.55, 2.60]){
-  G_FIX.add(post(x, 2.62, CH-0.022, CH-0.004, 0.050, 0.050, MAT.fixture, 14));
-  const L = new THREE.SpotLight(0xFFEBD2, 5.4, 4.0, 0.72, 0.55, 1.6);
-  L.position.set(x, CH-0.09, 2.62);
-  L.target.position.set(x, 1.35, 2.40);
-  G_LIGHT.add(L, L.target);
-}
-
-// pendants: reception counter, waiting group, window breakout.
-// The reception pendant sits just north of the counter face rather than over
-// the worktop, so it washes the side a client actually sees.
-pendant(2.12, 4.02, 1.00);
-pendant(1.50, 5.85, 1.15);
-pendant(9.40, 5.10, 1.05);
-
-// meeting room: a linear run on the table axis, plus downlights at the corners
-linearLight(7.45, 9.70, 1.95, 0.070, 4.2);
-downlight(7.30, 3.30); downlight(9.70, 3.30);
-downlight(7.30, 0.75); downlight(9.70, 0.75);
+// recessed modular luminaires on the 600 grid, over the two desk benches
+linearLight(5.70, 8.90, 3.475, 0.075, 4.2);
+linearLight(5.70, 8.90, 4.825, 0.075, 4.2);
+// entrance spine, running east from the main door
+linearLight(0.90, 6.10, 0.90, 0.065, 3.4);
+// reception and waiting
+downlight(1.05, 2.30); downlight(2.55, 2.60); downlight(0.70, 3.60);
+pendant(2.05, 3.20, PEND_DROP);
+// store and pantry
+downlight(0.80, 4.90); downlight(2.40, 5.60); downlight(1.15, 6.30);
+downlight(2.60, 7.10); downlight(3.60, 8.10);
+// flex bay
+downlight(4.60, 1.60); downlight(5.90, 3.00); downlight(3.55, 3.10);
+// meeting room
+linearLight(7.35, 9.35, 1.80, 0.070, 4.2);
+downlight(7.10, 3.15); downlight(9.55, 3.15);
+downlight(7.10, 0.55); downlight(9.55, 0.55);
+// window breakout
+pendant(9.15, 4.80, PEND_DROP);
+downlight(7.60, 4.60);
 // director's office
-linearLight(7.70, 8.60, 7.60, 0.065, 3.4);
-downlight(9.50, 6.85); downlight(7.30, 8.55); downlight(9.50, 8.55);
-// store, pantry, flex bay, circulation
-downlight(0.70, 0.70); downlight(2.30, 1.60);
-downlight(0.90, 8.30); downlight(2.30, 7.60);
-downlight(5.20, 1.20); downlight(4.10, 2.90); downlight(6.20, 2.90);
-downlight(0.70, 6.60); downlight(0.70, 2.80);
-downlight(7.90, 4.30); downlight(8.30, 5.90);
+linearLight(7.70, 8.50, 7.35, 0.065, 3.4);
+downlight(9.45, 6.55); downlight(7.15, 8.45); downlight(9.45, 8.45);
+// open work area, general
+downlight(5.70, 6.20); downlight(5.70, 7.60); downlight(3.35, 5.40);
+
+
 
 // FCU bulkhead: a warm brass-reveal wash grazing the corridor wall
-const wash = new THREE.RectAreaLight(0xFFE3BE, 1.9, 6.6, 0.24);
-wash.position.set(SHELL.BULKHEAD_W - 0.02, CH - SHELL.BULKHEAD_DROP + 0.02, 4.6);
-wash.lookAt(0, 0.9, 4.6);
+const wash = new THREE.RectAreaLight(0xFFE3BE, 1.7, 6.2, 0.22);
+wash.position.set(0.55, CH - 0.10, 4.40);
+wash.lookAt(0, 0.9, 4.40);
 G_LIGHT.add(wash); rectLights.push(wash);
 
 // reception sign halo lives with the other lights so it survives top view
@@ -2976,7 +2980,11 @@ addEventListener('resize', onResize);
    column is outlined in red the moment it lands there.
    ========================================================================== */
 
-const STORE_KEY   = 'consensusbiz.layout.v1';
+// v2: the shell changed on 28 Aug 2026 when the site survey superseded the
+// strata-plan dimensions. A layout saved against the old 10.3 x 9.1 box would
+// load into the smaller measured shell with furniture inside walls, so the key
+// is versioned and v1 data is simply ignored rather than silently mangled.
+const STORE_KEY   = 'consensusbiz.layout.v2';
 const SNAP_XY     = 0.05;      // 50 mm
 const SNAP_DEG    = 15;
 const elEdit  = $('edit'),   elPal   = $('palette'), elProps = $('props');
@@ -4027,7 +4035,8 @@ console.log('%cCONSENSUSBIZ — Petak 70, Tingkat 20, Menara A, Menara Landmark,
             'font-weight:700;color:#B08D57');
 console.log(
   `Floor area check: ${SURVEY.W} m × ${SURVEY.D} m = ${PARCEL_AREA.toFixed(2)} m²` +
-  `  (surveyed plan PA(B) 163454-19 states ${SURVEY.AREA_PLAN} m²)  →  ` +
+  `  (hand survey 28 Aug 2026 states ${SURVEY.AREA_PLAN} m²; strata plan ` +
+  `PA(B) 163454-19 said 94 m², measured to a different line)  →  ` +
   (areaOK ? 'MATCH ✔' : 'MISMATCH ✘'));
 if (!areaOK) console.error('Parcel area does not match the survey plan.');
 
@@ -4054,9 +4063,9 @@ const openTotal = ZONES.filter(z=>z.id==='open'||z.id==='flex')
                        .reduce((s,z)=>{const[a,b,c,d]=z.rect; return s+(b-a)*(d-c);},0);
 console.log(
   `Open-plan work area (desk bay + flex bay) = ${openTotal.toFixed(2)} m² against the ` +
-  `24 m² brief. The enclosed rooms were shrunk, not the aisles: the brief's own ` +
-  `schedule sums to ~96 m² before any circulation, which does not fit 93.73 m². ` +
-  `See README.md.`);
+  `24 m² brief. Measured on site the suite is 88.46 m², not the 93.73 m² the ` +
+  `strata plan implied, so the enclosed rooms were shrunk again rather than the ` +
+  `aisles. See README.md.`);
 
 /* --- 9c. Clash detection -------------------------------------------------
    No furniture bounding box may intersect a wall, a partition or the column. */
@@ -4065,23 +4074,26 @@ function overlaps(a, b, tol = 0.002){
          a.y0 < b.y1 - tol && a.y1 > b.y0 + tol &&
          a.z0 < b.z1 - tol && a.z1 > b.z0 + tol;
 }
-const furn  = itemColliders;                                  // the live layout
+/* Report exactly what the editor reports. validateLayout() is the single
+   source of truth: oriented boxes, per-solid-run for partitions, and — since
+   walls became layout items — furniture checked against where the partitions
+   actually are. An earlier version of this block tested only against `shell`
+   and so silently missed every furniture-into-partition clash. */
+const furn  = itemColliders;
 const shell = COLLIDERS.filter(c => c.kind === 'shell');
-const clashes = [];
-for (const f of furn)
-  for (const s of shell)
-    if (overlaps(f, s)) clashes.push({
-      Furniture: f.name, 'Clashes with': s.name,
-      'Overlap x': +(Math.min(f.x1,s.x1)-Math.max(f.x0,s.x0)).toFixed(3),
-      'Overlap y': +(Math.min(f.y1,s.y1)-Math.max(f.y0,s.y0)).toFixed(3),
-    });
+const clashes = [...validateLayout()].map(id => {
+  const it = LAYOUT.find(o => o.id === id), def = it && CATALOG[it.type];
+  return { Piece: def ? def.name : id,
+           x: it ? +it.x.toFixed(2) : '', y: it ? +it.y.toFixed(2) : '',
+           rot: it ? it.rot : '' };
+});
 // furniture must also stay inside the parcel
 const outside = furn.filter(f => f.x0 < -0.002 || f.x1 > W+0.002 ||
                                  f.y0 < -0.002 || f.y1 > D+0.002)
                     .map(f => f.name);
 
 console.log(`Clash check: ${furn.length} furniture volumes vs ${shell.length} shell/` +
-            `partition volumes (incl. the 600×600 column at ${SURVEY.COLUMN.cx}, ` +
+            `partition volumes (incl. the round column at ${SURVEY.COLUMN.cx}, ` +
             `${SURVEY.COLUMN.cy}) → ` +
             (clashes.length === 0 ? 'NO INTERSECTIONS ✔' : `${clashes.length} CLASH(ES) ✘`));
 if (clashes.length) console.table(clashes);
@@ -4125,11 +4137,10 @@ console.log(`Containment check: all furniture inside the parcel → ` +
                                    : '✘ below the 1.00 m secondary-aisle rule') + '\n' +
     `  · narrowest point overall : ${worst.toFixed(2)} m at ` +
     `x = ${at[0].toFixed(2)}, y = ${at[1].toFixed(2)}\n` +
-    `  The 600 × 600 column at (${SURVEY.COLUMN.cx}, ${SURVEY.COLUMN.cy}) is surveyed, ` +
-    `so the spine steps around it rather than through it: ` +
-    `${((6.25 - PT/2) - COL_Y1).toFixed(2)} m from the column's north face to the ` +
-    `director's partition line, opened up by the office door falling opposite it. ` +
-    `See README §5.`);
+    `  The round column at (${SURVEY.COLUMN.cx}, ${SURVEY.COLUMN.cy}) is measured on ` +
+    `site, so the spine steps around it rather than through it. It also costs one ` +
+    `desk: a 6-desk double bench cannot keep 900 mm behind the position nearest ` +
+    `the column, so the bench is five. See README §6.`);
 })();
 
 console.log(`Scene built: ${renderer.info.render.triangles || '—'} tris pending, ` +
@@ -4160,7 +4171,7 @@ function tick(now){
     elRead.innerHTML =
       `<b>${MODE.toUpperCase()}</b> · ${fps.toFixed(0)} fps` +
       (MODE === 'walk' ? ` · x ${p.x.toFixed(1)} y ${p.z.toFixed(1)}` : '') +
-      `<br>93.73 m² · ceiling 2.80 m`;
+      `<br>${PARCEL_AREA.toFixed(2)} m² · ceiling ${SURVEY.CEILING.toFixed(2)} m`;
   }
 }
 requestAnimationFrame(tick);
