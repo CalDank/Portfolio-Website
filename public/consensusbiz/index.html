@@ -401,13 +401,17 @@ const SURVEY = {
   CEILING       : 2.40,  // measured: "Office Ceiling Height 2400mm"
   RAISED_FLOOR  : 0.0,   // none — carpet is laid straight onto the slab
 
-  COLUMN : { cx: 6.43, cy: 5.44, r: 0.325 },   // round, not square
+  COLUMN : { cx: 9.37, cy: 5.44, r: 0.375 },   // round, at the end of the room
+                                               // divider and close to the facade
 
   // Punched windows in a solid facade. Widths are measured; the setting-out
   // along the facade is the least certain thing on the page, so it is a plain
   // list of window start positions — correct these first if the site says so.
   WIN_W : 1.651, WIN_H : 1.524, WIN_SILL : 0.750,
-  WIN_AT: [0.447, 2.545, 4.643, 6.741],
+  // One opening per space. The notebook draws three bars along the facade;
+  // partitions must land in piers, so the setting-out is taken from the room
+  // divisions rather than the other way round.
+  WIN_AT: [0.489, 3.205, 6.315],
 
   // two solid fire doors, one in each corner of the entrance wall
   DOORS : [{ a: 0.35, b: 1.25 }, { a: 7.59, b: 8.49 }],
@@ -475,15 +479,19 @@ const C = {
    along the y = 0 wall from the main door rather than through the middle, and
    reception faces back down it. The second door serves a back-of-house lobby
    between the store and the pantry. */
+/* Zones follow the MEASURED partitions, not a re-plan. The two window-side
+   rooms are exactly the ones on the notebook page: a run of partition 17'10"
+   long at 21'1" from the entrance, divided at 8'7½" and again at 8'6½". Only
+   the store and pantry walls near the entrance are new work. */
 const ZONES = [
   { id:'recep',   name:'Reception & Waiting',         brief:14, rect:[0.00, 3.10, 0.00, 4.10],  floor:'oak'    },
   { id:'store',   name:'Document & Compliance Store', brief: 7, rect:[0.00, 3.10, 4.10, 6.60],  floor:'carpet' },
-  { id:'pantry',  name:'Pantry Nook',                 brief: 6, rect:[2.00, 4.20, 6.60, 8.839], floor:'oak'    },
-  { id:'flex',    name:'Flex Bay & Phone Booth',      brief: 0, rect:[3.10, 6.50, 0.00, 3.60],  floor:'oak'    },
-  { id:'open',    name:'Open Workstations',           brief:24, rect:[3.10, 6.50, 5.10, 8.839], floor:'oak'    },
-  { id:'meet',    name:'Client Meeting Room',         brief:14, rect:[6.50,10.008, 0.00, 3.60], floor:'carpet' },
-  { id:'break',   name:'Window Breakout',             brief: 5, rect:[8.10,10.008, 3.60, 6.00], floor:'oak'    },
-  { id:'dir',     name:"Director's Office",           brief:11, rect:[6.50,10.008, 6.00, 8.839],floor:'carpet' },
+  { id:'pantry',  name:'Pantry Nook',                 brief: 6, rect:[0.00, 2.20, 6.60, 8.839], floor:'oak'    },
+  { id:'flex',    name:'Flex Bay & Phone Booth',      brief: 0, rect:[3.10, 6.426, 0.00, 4.10], floor:'oak'    },
+  { id:'break',   name:'Breakout & Touchdown',        brief: 5, rect:[3.10, 6.426, 6.60, 8.839],floor:'oak'    },
+  { id:'meet',    name:'Client Meeting Room',         brief:14, rect:[6.426,10.008, 0.00, 2.629],floor:'carpet'},
+  { id:'dir',     name:"Director's Office",           brief:11, rect:[6.426,10.008, 2.629, 5.436],floor:'carpet'},
+  { id:'open',    name:'Open Workstations',           brief:24, rect:[6.426,10.008, 5.436, 8.839],floor:'oak'  },
 ];
 // Zone rectangles are dimensioned to PARTITION CENTRELINES, the usual space-
 // planning convention; clear internal dims are ~45 mm less on each partitioned
@@ -2037,7 +2045,7 @@ function wallPier(len){
 
 /* ---- Pantry nook: fixed joinery only ------------------------------------ */
 (function pantry(){
-  const cy1 = D, cy0 = D - DIM.COUNTER_D, h = DIM.COUNTER_H, PX0 = 2.10, PX1 = 4.15;
+  const cy1 = D, cy0 = D - DIM.COUNTER_D, h = DIM.COUNTER_H, PX0 = 0.10, PX1 = 2.10;
   G_FURN.add(slab(PX0, PX1, cy0, cy1, 0.090, h-0.035, MAT.lam,
                   { name:'pantry_counter', kind:'fixture' }));
   G_FURN.add(slab(PX0+0.04, PX1-0.04, cy0+0.06, cy1, 0, 0.090, MAT.lamDk, { collide:false }));
@@ -2215,36 +2223,33 @@ const CATALOG = {
    This is the layout the walkthrough opens with and the one "Reset" returns
    to. Editing never touches it; edits live in localStorage. ---------------- */
 const DEFAULT_LAYOUT = [
-  /* ---- partitions ------------------------------------------------------
-     Re-planned into the measured shell. The window wall is now solid with
-     four punched openings, so the enclosed rooms are pushed to the two ends
-     of it and each takes a window; the middle opening is left to the
-     breakout so the open floor still gets daylight.                        */
-  // reception / store: solid back-of-house line, door at the reception end
+  /* ---- partitions AS MEASURED ------------------------------------------
+     Straight off the notebook page. The run parallel to the entrance sits at
+     21'1" (6.426 m) and is 17'10" (5.436 m) long, so the last 11'6" of that
+     line is open to the facade corner. It is divided at 8'7½" (2.629) and
+     again at 8'6½" (5.233), giving the two window-side rooms the photos show,
+     each with its own opening. The round column stands at the end of the
+     second divider, close to the facade.                                    */
+  { type:'wall_solid',        x:6.426, y:2.718, rot:90, len:5.436, door:0.20 },
+  { type:'wall_glazed',       x:8.186, y:2.629, rot:0,  len:3.440, door:0.86 },
+  { type:'wall_solid',        x:7.732, y:5.233, rot:0,  len:2.527 },
+
+  /* ---- new work, entrance side only ------------------------------------ */
   { type:'wall_solid',        x:1.550, y:4.100, rot:0,  len:3.100, door:0.80 },
   { type:'wall_feature',      x:1.700, y:4.055, rot:0,  len:1.900 },
-  // store / back lobby / pantry
   { type:'wall_solid',        x:3.100, y:5.350, rot:90, len:2.500 },
-  { type:'wall_solid',        x:2.000, y:7.720, rot:90, len:2.239 },
-  { type:'wall_solid',        x:2.975, y:6.600, rot:0,  len:1.950 },
-  // meeting room: glazed, AV pier, glazed with the door at the spine end
-  { type:'wall_glazed',       x:6.500, y:0.750, rot:90, len:1.500 },
-  { type:'wall_pier',         x:6.500, y:2.050, rot:90, len:1.100 },
-  { type:'wall_glazed',       x:6.500, y:3.100, rot:90, len:1.000 },
-  { type:'wall_glazed',       x:8.2225,y:3.600, rot:0,  len:3.400, door:0.16 },
-  // director's office, frosted band at seated height
-  { type:'wall_glazed_frost', x:8.2225,y:6.000, rot:0,  len:3.400, door:0.20 },
-  { type:'wall_glazed_frost', x:6.500, y:7.415, rot:90, len:2.830 },
+  { type:'wall_solid',        x:1.100, y:6.600, rot:0,  len:2.200 },
+  { type:'wall_solid',        x:2.200, y:7.720, rot:90, len:2.239 },
 
-  /* ---- reception & waiting, at the main door -------------------------- */
+  /* ---- reception & waiting, at the main fire door ---------------------- */
   { type:'task_chair',    x:2.30,  y:3.66, rot:180 },
   { type:'sofa2',         x:0.48,  y:2.75, rot:270 },
   { type:'coffee_table',  x:1.20,  y:2.90, rot:90  },
   { type:'planter_tall',  x:2.80,  y:1.95, rot:0   },
-  { type:'brochure_rack', x:2.80,  y:3.70, rot:90  },
   { type:'coat_stand',    x:0.35,  y:3.80, rot:0   },
+  { type:'brochure_rack', x:2.80,  y:3.70, rot:90  },
 
-  /* ---- document & compliance store ------------------------------------ */
+  /* ---- document & compliance store ------------------------------------- */
   { type:'file_cabinet',  x:0.300, y:4.60, rot:0 },
   { type:'file_cabinet',  x:0.795, y:4.60, rot:0 },
   { type:'file_cabinet',  x:1.290, y:4.60, rot:0 },
@@ -2254,59 +2259,52 @@ const DEFAULT_LAYOUT = [
   { type:'printer_mfd',   x:0.50,  y:6.20, rot:180 },
   { type:'shredder',      x:1.20,  y:6.30, rot:180 },
 
-  /* ---- pantry nook ----------------------------------------------------- */
-  { type:'stool',         x:2.42,  y:7.30, rot:90 },
-  { type:'stool',         x:2.42,  y:7.90, rot:90 },
-  { type:'bins',          x:3.70,  y:8.55, rot:180 },
-  { type:'water_cooler',  x:2.25,  y:6.90, rot:0 },
+  /* ---- pantry nook ------------------------------------------------------ */
+  { type:'stool',         x:0.55,  y:7.30, rot:90 },
+  { type:'stool',         x:0.55,  y:7.90, rot:90 },
+  { type:'water_cooler',  x:1.90,  y:6.95, rot:0 },
 
-  /* ---- flex bay: booth, touchdown, planting --------------------------- */
+  /* ---- flex bay --------------------------------------------------------- */
   { type:'phone_booth',   x:3.90,  y:2.95, rot:180 },
-  { type:'plant_tree',    x:3.70,  y:4.60, rot:0   },
-  { type:'planter_sm',    x:5.85,  y:5.60, rot:0   },
+  { type:'plant_tree',    x:5.80,  y:7.00, rot:0   },
 
-  /* ---- open workstations: two benches of three ------------------------ */
-  { type:'workstation',     x:4.375, y:5.825, rot:270 },
-  { type:'workstation',     x:4.375, y:6.975, rot:270 },
-  { type:'workstation_std', x:4.375, y:8.125, rot:270 },
-  { type:'workstation',     x:5.125, y:6.975, rot:90  },
-  { type:'workstation',     x:5.125, y:8.125, rot:90  },
-  { type:'screen_345',      x:4.750, y:6.975, rot:90  },
-  { type:'pedestal',      x:4.200, y:5.510, rot:0 },
-  { type:'pedestal',      x:4.200, y:6.660, rot:0 },
-  { type:'pedestal',      x:4.200, y:7.810, rot:0 },
-  { type:'pedestal',      x:5.300, y:6.660, rot:0 },
-  { type:'pedestal',      x:5.300, y:7.810, rot:0 },
-  { type:'task_chair',    x:3.550, y:5.825, rot:270 },
-  { type:'task_chair_dk', x:3.550, y:6.975, rot:270 },
-  { type:'task_chair',    x:3.550, y:8.125, rot:270 },
-  { type:'task_chair_dk', x:5.950, y:6.975, rot:90  },
-  { type:'task_chair',    x:5.950, y:8.125, rot:90  },
+  /* ---- breakout & touchdown -------------------------------------------- */
+  { type:'round_table',   x:4.60,  y:7.70, rot:0   },
+  { type:'conf_chair_lt', x:3.92,  y:7.70, rot:270 },
+  { type:'conf_chair_lt', x:5.28,  y:7.70, rot:90  },
+  { type:'bins',          x:5.85,  y:8.55, rot:180 },
 
-  /* ---- client meeting room --------------------------------------------- */
-  { type:'conf_table',    x:8.35,  y:1.80, rot:0 },
-  { type:'conf_chair',    x:7.60,  y:0.85, rot:0 },
-  { type:'conf_chair',    x:8.35,  y:0.85, rot:0 },
-  { type:'conf_chair',    x:9.10,  y:0.85, rot:0 },
-  { type:'conf_chair',    x:7.60,  y:2.75, rot:180 },
-  { type:'conf_chair',    x:8.35,  y:2.75, rot:180 },
-  { type:'conf_chair',    x:9.10,  y:2.75, rot:180 },
-  { type:'credenza',      x:8.55,  y:3.32, rot:180 },
-  { type:'desk_plant',    x:9.45,  y:3.32, rot:0, z:0.720 },
+  /* ---- client meeting room: a 4-seat room, which is what 9.4 m2 takes --- */
+  { type:'meet_table_4',  x:8.20,  y:1.45, rot:0 },
+  { type:'conf_chair',    x:8.20,  y:0.70, rot:0 },
+  { type:'conf_chair',    x:8.20,  y:2.20, rot:180 },
+  { type:'conf_chair',    x:7.45,  y:1.45, rot:270 },
+  { type:'conf_chair',    x:8.95,  y:1.45, rot:90 },
 
-  /* ---- director's office ----------------------------------------------- */
-  { type:'exec_desk',     x:8.10,  y:7.35, rot:270 },
-  { type:'exec_chair',    x:7.25,  y:7.35, rot:270 },
-  { type:'conf_chair_lt', x:9.05,  y:6.95, rot:90  },
-  { type:'conf_chair_lt', x:9.05,  y:7.80, rot:90  },
-  { type:'bookcase',      x:8.60,  y:8.62, rot:0   },
-  { type:'side_table',    x:9.55,  y:6.40, rot:0   },
+  /* ---- director's office ------------------------------------------------ */
+  { type:'exec_desk',     x:8.20,  y:3.60, rot:180 },
+  { type:'exec_chair',    x:8.20,  y:4.60, rot:180 },
+  { type:'conf_chair_lt', x:7.60,  y:3.02, rot:0   },
+  { type:'conf_chair_lt', x:8.80,  y:3.02, rot:0   },
+  { type:'bookcase',      x:7.00,  y:4.45, rot:270 },
+  { type:'side_table',    x:9.55,  y:4.30, rot:0   },
 
-  /* ---- window breakout -------------------------------------------------- */
-  { type:'round_table',   x:9.15,  y:4.80, rot:0   },
-  { type:'conf_chair_lt', x:9.15,  y:4.12, rot:0   },
-  { type:'conf_chair_lt', x:9.15,  y:5.48, rot:180 },
-  { type:'planter_md',    x:7.30,  y:5.60, rot:0   },
+  /* ---- open workstations, in the daylit facade bay ---------------------- */
+  { type:'workstation',     x:7.701, y:6.565, rot:270 },
+  { type:'workstation_std', x:7.701, y:7.715, rot:270 },
+  { type:'workstation',     x:8.451, y:6.565, rot:90  },
+  { type:'workstation',     x:8.451, y:7.715, rot:90  },
+  { type:'screen_120',      x:8.076, y:6.565, rot:90 },
+  { type:'screen_120',      x:8.076, y:7.715, rot:90 },
+  { type:'pedestal',      x:7.680, y:6.055, rot:0 },
+  { type:'pedestal',      x:7.680, y:7.205, rot:0 },
+  { type:'pedestal',      x:8.470, y:6.055, rot:0 },
+  { type:'pedestal',      x:8.470, y:7.205, rot:0 },
+  { type:'task_chair',    x:6.980, y:6.565, rot:270 },
+  { type:'task_chair_dk', x:6.980, y:7.715, rot:270 },
+  { type:'task_chair',    x:9.180, y:6.565, rot:90  },
+  { type:'task_chair_dk', x:9.180, y:7.715, rot:90  },
+  { type:'desk_plant',    x:7.701, y:6.930, rot:0, z:0.740 },
 ];
 
 
@@ -4138,9 +4136,9 @@ console.log(`Containment check: all furniture inside the parcel → ` +
     `  · narrowest point overall : ${worst.toFixed(2)} m at ` +
     `x = ${at[0].toFixed(2)}, y = ${at[1].toFixed(2)}\n` +
     `  The round column at (${SURVEY.COLUMN.cx}, ${SURVEY.COLUMN.cy}) is measured on ` +
-    `site, so the spine steps around it rather than through it. It also costs one ` +
-    `desk: a 6-desk double bench cannot keep 900 mm behind the position nearest ` +
-    `the column, so the bench is five. See README §6.`);
+    `site, so the spine steps around it rather than through it. The two measured ` +
+    `rooms take the southern window bays, so the desks sit in the daylit facade ` +
+    `bay — 3.40 m across, which takes four, not six. See README §6.`);
 })();
 
 console.log(`Scene built: ${renderer.info.render.triangles || '—'} tris pending, ` +
