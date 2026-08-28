@@ -411,7 +411,7 @@ const SURVEY = {
   // One opening per space. The notebook draws three bars along the facade;
   // partitions must land in piers, so the setting-out is taken from the room
   // divisions rather than the other way round.
-  WIN_AT: [0.489, 3.205, 6.315],
+  WIN_AT: [0.318, 2.604, 5.875],
 
   // two solid fire doors, one in each corner of the entrance wall
   DOORS : [{ a: 0.35, b: 1.25 }, { a: 7.59, b: 8.49 }],
@@ -486,15 +486,19 @@ const C = {
    rooms are exactly the ones on the notebook page: a run of partition 17'10"
    long at 21'1" from the entrance, divided at 8'7½" and again at 8'6½". Only
    the store and pantry walls near the entrance are new work. */
+/* The PROPOSED layout, off the second notebook page. Dimensions on that page:
+   19' + 10' across the top, 15' + 6' + 12' down the right, 23' + 10' down the
+   left, 15' + 14' along the bottom — all of which close on the measured
+   29' x 32'10" shell.
+     19' = 5.791   10' = 3.048   15' = 4.572   6' = 1.829
+     12' = 3.658   23' = 7.010   14' = 4.267                                  */
 const ZONES = [
-  { id:'recep',   name:'Reception & Waiting',         brief:14, rect:[0.00, 3.10, 0.00, 4.10],  floor:'carpet' },
-  { id:'store',   name:'Document & Compliance Store', brief: 7, rect:[0.00, 3.10, 4.10, 6.60],  floor:'carpet' },
-  { id:'pantry',  name:'Pantry Nook',                 brief: 6, rect:[0.00, 2.20, 6.60, 8.839], floor:'carpet' },
-  { id:'flex',    name:'Flex Bay & Phone Booth',      brief: 0, rect:[3.10, 6.426, 0.00, 4.10], floor:'carpet' },
-  { id:'break',   name:'Breakout & Touchdown',        brief: 5, rect:[3.10, 6.426, 6.60, 8.839],floor:'carpet' },
-  { id:'meet',    name:'Client Meeting Room',         brief:14, rect:[6.426,10.008, 0.00, 2.629],floor:'carpet'},
-  { id:'dir',     name:"Director's Office",           brief:11, rect:[6.426,10.008, 2.629, 5.436],floor:'carpet'},
-  { id:'open',    name:'Open Workstations',           brief:24, rect:[6.426,10.008, 5.436, 8.839],floor:'carpet'},
+  { id:'open',    name:'Open Office & Waiting',  brief:24, rect:[0.00, 6.401, 0.00, 5.791],  floor:'carpet' },
+  { id:'mr',      name:'M/R',                    brief:14, rect:[0.00, 4.572, 5.791, 8.839], floor:'carpet' },
+  { id:'filing',  name:'Filing Room',            brief: 7, rect:[4.572, 6.401, 5.791, 8.839],floor:'carpet' },
+  { id:'director',name:'Director Room',          brief:11, rect:[6.401,10.008, 4.572, 8.839],floor:'carpet' },
+  { id:'manager', name:'Manager',                brief: 0, rect:[7.010,10.008, 0.00, 2.286], floor:'carpet' },
+  { id:'finance', name:'Finance / Account',      brief: 0, rect:[7.010,10.008, 2.286, 4.572],floor:'carpet' },
 ];
 // Zone rectangles are dimensioned to PARTITION CENTRELINES, the usual space-
 // planning convention; clear internal dims are ~45 mm less on each partitioned
@@ -517,7 +521,7 @@ const CIRC = {
   // Section 9d measures clear width along it. Leg 0 is the straight run.
   // in through the corner door, east along the y = 0 wall, then north around
   // the round column and out to the breakout at the window
-  SPINE_ROUTE   : [[0.30, 0.85], [5.85, 0.85], [5.85, 4.30], [8.30, 4.60]],
+  SPINE_ROUTE   : [[0.30, 0.80], [6.60, 0.80], [6.60, 3.40]],
 };
 
 /* --- 1f. FURNITURE DIMENSIONS ------------------------------------------- */
@@ -2072,91 +2076,9 @@ function wallPier(len){
    and section 5c renders.
    ========================================================================== */
 
-/* ---- Reception & waiting ------------------------------------------------
-   Desk backs onto the slat wall so the receptionist faces anyone stepping
-   through the entrance; the waiting group sits north of it, off the spine. -*/
-(function reception(){
-  // Counter: navy carcass, oak worktop, brass reveal, raised transaction shelf.
-  // 620 mm deep rather than 700, and the transaction shelf steps up *within*
-  // the footprint instead of oversailing it, so the counter face lands exactly
-  // on y = 3.75 and the 1.5 m entrance spine stays 1.5 m wide past reception.
-  // Re-set for the measured shell: the counter backs onto the store line at
-  // y = 4.055 with a 700 staff zone behind it, and faces the main fire door in
-  // the corner at y = 0.80.
-  const x0=1.60, x1=3.05, y0=2.69, y1=3.31, h=0.750;
-  G_FURN.add(slab(x0, x1, y0, y1, 0.060, h, MAT.navy, { name:'reception_desk' }));
-  G_FURN.add(slab(x0+0.04, x1-0.04, y0+0.04, y1-0.04, 0, 0.060, MAT.lamDk, { collide:false }));
-  G_FURN.add(slab(x0-0.02, x1+0.02, y0-0.02, y1, h, h+0.032, MAT.oak, { collide:false }));
-  G_FURN.add(slab(x0-0.024, x1+0.024, y1-0.008, y1, 0.060, h, MAT.brass, { collide:false }));
-  // transaction shelf on brass standoffs, held inside the counter face
-  G_FURN.add(slab(x0-0.05, x1+0.05, y1-0.200, y1, 1.060, 1.095, MAT.oak, { collide:false }));
-  for (const x of [x0+0.12, (x0+x1)/2, x1-0.12])
-    G_FURN.add(slab(x-0.018, x+0.018, y1-0.075, y1-0.035, h+0.032, 1.060, MAT.brass,
-                    { collide:false }));
-  addCollider(x0-0.05, x1+0.05, y0-0.02, y1, 0, 1.095, 'reception_counter', 'fixture');
-  // desktop kit. The monitor faces the visitor side (local -Y, so deg 0) —
-  // it was previously placed at 180 and showed the receptionist its back.
-  place(monitor(0.520,0.310), 2.30, 2.92, 0);
-  G_FURN.add(slab(1.75, 1.91, 2.84, 3.00, h+0.032, h+0.062, MAT.lamDk, { collide:false })); // phone
-  place(deskPlant(), 2.90, 2.90, 0);
-  // entrance mat
-  G_FURN.add(plane(0.02, 1.00, SURVEY.DOORS[0].a, SURVEY.DOORS[0].b, 0.010, MAT.fabricDk));
-})();
 
-/* ---- Pantry nook: fixed joinery only ------------------------------------ */
-(function pantry(){
-  const cy1 = D, cy0 = D - DIM.COUNTER_D, h = DIM.COUNTER_H, PX0 = 0.10, PX1 = 2.10;
-  G_FURN.add(slab(PX0, PX1, cy0, cy1, 0.090, h-0.035, MAT.lam,
-                  { name:'pantry_counter', kind:'fixture' }));
-  G_FURN.add(slab(PX0+0.04, PX1-0.04, cy0+0.06, cy1, 0, 0.090, MAT.lamDk, { collide:false }));
-  // Worktop, built as four strips around the sink cut-out — a single slab would
-  // bury the basin under it.
-  const sx0=PX0+0.50, sx1=PX0+1.04, sy0=cy0+0.11, sy1=cy1-0.09, wt0=cy0-0.030;
-  G_FURN.add(slab(PX0-0.04, sx0, wt0, cy1, h-0.035, h, MAT.walnut, { collide:false }));
-  G_FURN.add(slab(sx1, PX1+0.04, wt0, cy1, h-0.035, h, MAT.walnut, { collide:false }));
-  G_FURN.add(slab(sx0, sx1, wt0, sy0, h-0.035, h, MAT.walnut, { collide:false }));
-  G_FURN.add(slab(sx0, sx1, sy1, cy1, h-0.035, h, MAT.walnut, { collide:false }));
-  // cabinet door lines + brass pulls
-  for (let i=0;i<5;i++){
-    const x = PX0 + 0.02 + i*0.402;
-    G_FURN.add(slab(x, x+0.386, cy0-0.012, cy0-0.004, 0.095, h-0.045, MAT.lam, { collide:false }));
-    G_FURN.add(slab(x+0.17, x+0.22, cy0-0.024, cy0-0.010, h-0.13, h-0.11, MAT.brass, { collide:false }));
-  }
-  // under-counter fridge, expressed as a steel door panel
-  G_FURN.add(slab(PX1-0.70, PX1-0.04, cy0-0.020, cy0-0.006, 0.095, h-0.045, MAT.steel, { collide:false }));
-  G_FURN.add(slab(PX1-0.67, PX1-0.62, cy0-0.032, cy0-0.018, 0.30, 0.66, MAT.brass, { collide:false }));
-  // stainless basin dropped into the cut-out: bottom, four sides, and a rim
-  G_FURN.add(slab(sx0, sx1, sy0, sy1, h-0.175, h-0.160, MAT.steel, { collide:false }));
-  G_FURN.add(slab(sx0, sx0+0.014, sy0, sy1, h-0.175, h, MAT.steel, { collide:false }));
-  G_FURN.add(slab(sx1-0.014, sx1, sy0, sy1, h-0.175, h, MAT.steel, { collide:false }));
-  G_FURN.add(slab(sx0, sx1, sy0, sy0+0.014, h-0.175, h, MAT.steel, { collide:false }));
-  G_FURN.add(slab(sx0, sx1, sy1-0.014, sy1, h-0.175, h, MAT.steel, { collide:false }));
-  G_FURN.add(slab(sx0-0.012, sx1+0.012, sy0-0.012, sy1+0.012, h, h+0.006, MAT.steel,
-                  { collide:false }));
-  G_FURN.add(post((sx0+sx1)/2, (sy0+sy1)/2, h-0.160, h-0.150, 0.030, 0.030, MAT.lamDk, 12));
-  G_FURN.add(post(PX0+0.77, cy1-0.14, h, h+0.055, 0.028, 0.028, MAT.brass, 12));
-  G_FURN.add(post(PX0+0.77, cy1-0.30, h+0.230, h+0.275, 0.019, 0.019, MAT.brass, 12));
-  G_FURN.add(post(PX0+0.77, cy1-0.14, h+0.055, h+0.275, 0.019, 0.019, MAT.brass, 12));
-  G_FURN.add(slab(PX0+0.755, PX0+0.785, cy1-0.30, cy1-0.14, h+0.255, h+0.275, MAT.brass, { collide:false }));
-  // upper cabinets — high-level joinery, so they live in G_ABOVE and drop out
-  // of the plan view rather than hiding the counter below them
-  G_ABOVE.add(slab(PX0, PX1-0.35, cy1-0.350, cy1, 1.500, 2.200, MAT.lam,
-                   { name:'pantry_uppers', kind:'fixture' }));
-  for (let i=0;i<4;i++){
-    const x = PX0 + 0.03 + i*0.415;
-    G_ABOVE.add(slab(x, x+0.395, cy1-0.362, cy1-0.352, 1.512, 2.188, MAT.walnut, { collide:false }));
-    G_ABOVE.add(slab(x+0.17, x+0.24, cy1-0.374, cy1-0.360, 1.545, 1.565, MAT.brass, { collide:false }));
-  }
-  // coffee machine + mugs
-  place(coffeeMachine(), PX0+1.55, cy0+0.30, 180, null);
-  for (let i=0;i<3;i++)
-    G_FURN.add(post(PX0+1.05+i*0.10, cy0+0.44, h, h+0.085, 0.038, 0.038, MAT.lam, 12));
-  // narrow standing ledge against the corridor wall
-  G_FURN.add(slab(PX0-0.06, PX0+0.06, 6.75, 8.30, 1.020, 1.058, MAT.walnut,
-                  { name:'pantry_ledge', kind:'fixture' }));
-  for (const y of [7.10, 7.95])
-    G_FURN.add(slab(PX0-0.04, PX0+0.04, y-0.020, y+0.020, 0.900, 1.020, MAT.brass, { collide:false }));
-})();
+
+
 
 
 
@@ -2283,88 +2205,94 @@ const CATALOG = {
    This is the layout the walkthrough opens with and the one "Reset" returns
    to. Editing never touches it; edits live in localStorage. ---------------- */
 const DEFAULT_LAYOUT = [
-  /* ---- partitions AS MEASURED ------------------------------------------
-     Straight off the notebook page. The run parallel to the entrance sits at
-     21'1" (6.426 m) and is 17'10" (5.436 m) long, so the last 11'6" of that
-     line is open to the facade corner. It is divided at 8'7½" (2.629) and
-     again at 8'6½" (5.233), giving the two window-side rooms the photos show,
-     each with its own opening. The round column stands at the end of the
-     second divider, close to the facade.                                    */
-  { type:'wall_solid',        x:6.426, y:2.718, rot:90, len:5.436, door:0.20 },
-  { type:'wall_glazed',       x:8.186, y:2.629, rot:0,  len:3.440, door:0.86 },
-  { type:'wall_solid',        x:7.732, y:5.233, rot:0,  len:2.527 },
+  /* ---- partitions, off the proposed sketch ------------------------------
+     y = 5.791 (19')  M/R and Filing Room left wall, run x 0 -> 6.401
+     x = 4.572 (15')  M/R back wall, the Filing Room sits behind it
+     x = 6.401 (21')  Filing / Director line, run y 4.572 -> 8.839
+     y = 4.572 (15')  Director Room left wall
+     x = 7.010 (23')  Manager and Finance front wall
+     y = 2.286        divides Manager from Finance / Account                 */
+  { type:'wall_glazed',       x:2.286, y:5.791, rot:0,  len:4.572, door:0.15 },
+  { type:'wall_solid',        x:5.487, y:5.791, rot:0,  len:1.829, door:0.56 },
+  { type:'wall_solid',        x:4.572, y:7.315, rot:90, len:3.048 },
+  { type:'wall_solid',        x:6.401, y:6.706, rot:90, len:4.267, door:0.12 },
+  { type:'wall_solid',        x:8.176, y:4.572, rot:0,  len:3.550 },
+  { type:'wall_glazed_frost', x:7.010, y:1.143, rot:90, len:2.286, door:0.70 },
+  { type:'wall_glazed_frost', x:7.010, y:3.429, rot:90, len:2.286, door:0.27 },
+  { type:'wall_solid',        x:8.480, y:2.286, rot:0,  len:2.940 },
 
-  /* ---- new work, entrance side only ------------------------------------ */
-  { type:'wall_solid',        x:1.550, y:4.100, rot:0,  len:3.100, door:0.80 },
-  { type:'wall_feature',      x:1.700, y:4.055, rot:0,  len:1.900 },
-  { type:'wall_solid',        x:3.100, y:5.350, rot:90, len:2.500 },
-  { type:'wall_solid',        x:1.100, y:6.600, rot:0,  len:2.200 },
-  { type:'wall_solid',        x:2.200, y:7.720, rot:90, len:2.239 },
+  /* ---- open office: waiting by the door, two benches of three ----------- */
+  { type:'sofa2',         x:0.50,  y:3.20, rot:270 },
+  { type:'coffee_table',  x:1.05,  y:3.20, rot:90  },
+  { type:'planter_tall',  x:0.45,  y:4.60, rot:0   },
+  { type:'coat_stand',    x:0.42,  y:2.10, rot:0   },
+  { type:'brochure_rack', x:0.40,  y:1.90, rot:270 },
 
-  /* ---- reception & waiting, at the main fire door ---------------------- */
-  { type:'task_chair',    x:2.30,  y:3.66, rot:180 },
-  { type:'sofa2',         x:0.48,  y:2.75, rot:270 },
-  { type:'coffee_table',  x:1.20,  y:2.90, rot:90  },
-  { type:'planter_tall',  x:2.80,  y:1.95, rot:0   },
-  { type:'coat_stand',    x:0.35,  y:3.80, rot:0   },
-  { type:'brochure_rack', x:2.80,  y:3.70, rot:90  },
+  { type:'desk_single',   x:5.40,  y:2.30, rot:270 },
+  { type:'task_chair',    x:4.70,  y:2.30, rot:270 },
 
-  /* ---- document & compliance store ------------------------------------- */
-  { type:'file_cabinet',  x:0.300, y:4.60, rot:0 },
-  { type:'file_cabinet',  x:0.795, y:4.60, rot:0 },
-  { type:'file_cabinet',  x:1.290, y:4.60, rot:0 },
-  { type:'file_cabinet',  x:1.785, y:4.60, rot:0 },
-  { type:'safe',          x:2.55,  y:4.62, rot:0 },
-  { type:'shelving_wide', x:2.80,  y:5.85, rot:90 },
-  { type:'printer_mfd',   x:0.50,  y:6.20, rot:180 },
-  { type:'shredder',      x:1.20,  y:6.30, rot:180 },
+  { type:'workstation',     x:2.00, y:3.475, rot:0   },
+  { type:'workstation',     x:3.15, y:3.475, rot:0   },
+  { type:'workstation_std', x:4.30, y:3.475, rot:0   },
+  { type:'workstation',     x:2.00, y:4.225, rot:180 },
+  { type:'workstation',     x:3.15, y:4.225, rot:180 },
+  { type:'workstation',     x:4.30, y:4.225, rot:180 },
+  { type:'screen_345',      x:3.15, y:3.850, rot:0   },
+  { type:'task_chair',    x:2.00,  y:2.75, rot:0   },
+  { type:'task_chair_dk', x:3.15,  y:2.75, rot:0   },
+  { type:'task_chair',    x:4.30,  y:2.75, rot:0   },
+  { type:'task_chair',    x:2.00,  y:4.95, rot:180 },
+  { type:'task_chair_dk', x:3.15,  y:4.95, rot:180 },
+  { type:'task_chair',    x:4.30,  y:4.95, rot:180 },
+  { type:'pedestal',      x:1.55,  y:3.50, rot:0 },
+  { type:'pedestal',      x:2.70,  y:3.50, rot:0 },
+  { type:'pedestal',      x:3.85,  y:3.50, rot:0 },
+  { type:'pedestal',      x:1.55,  y:4.20, rot:0 },
+  { type:'pedestal',      x:2.70,  y:4.20, rot:0 },
+  { type:'pedestal',      x:3.85,  y:4.20, rot:0 },
+  { type:'plant_tree',    x:5.80,  y:4.60, rot:0 },
 
-  /* ---- pantry nook ------------------------------------------------------ */
-  { type:'stool',         x:0.55,  y:7.30, rot:90 },
-  { type:'stool',         x:0.55,  y:7.90, rot:90 },
-  { type:'water_cooler',  x:1.90,  y:6.95, rot:0 },
+  /* ---- M/R: the sketch draws an oval table with eight seats ------------- */
+  { type:'conf_table_8',  x:2.286, y:7.315, rot:0 },
+  { type:'conf_chair',    x:1.086, y:6.30,  rot:0 },
+  { type:'conf_chair',    x:1.886, y:6.30,  rot:0 },
+  { type:'conf_chair',    x:2.686, y:6.30,  rot:0 },
+  { type:'conf_chair',    x:3.486, y:6.30,  rot:0 },
+  { type:'conf_chair',    x:1.086, y:8.33,  rot:180 },
+  { type:'conf_chair',    x:1.886, y:8.33,  rot:180 },
+  { type:'conf_chair',    x:2.686, y:8.33,  rot:180 },
+  { type:'conf_chair',    x:3.486, y:8.33,  rot:180 },
+  { type:'credenza',      x:0.55,  y:7.315, rot:90 },
+  { type:'tv_stand',      x:4.20,  y:7.315, rot:270 },
 
-  /* ---- flex bay --------------------------------------------------------- */
-  { type:'phone_booth',   x:3.90,  y:2.95, rot:180 },
-  { type:'plant_tree',    x:5.80,  y:7.00, rot:0   },
+  /* ---- Filing Room ------------------------------------------------------ */
+  { type:'shelving_wide', x:5.55,  y:8.62, rot:0 },
+  { type:'file_cabinet',  x:4.95,  y:6.15, rot:270 },
+  { type:'file_cabinet',  x:4.95,  y:6.65, rot:270 },
+  { type:'file_cabinet',  x:4.95,  y:7.15, rot:270 },
+  { type:'safe',          x:6.05,  y:6.20, rot:90 },
+  { type:'printer_mfd',   x:6.02,  y:7.30, rot:90 },
 
-  /* ---- breakout & touchdown -------------------------------------------- */
-  { type:'round_table',   x:4.60,  y:7.70, rot:0   },
-  { type:'conf_chair_lt', x:3.92,  y:7.70, rot:270 },
-  { type:'conf_chair_lt', x:5.28,  y:7.70, rot:90  },
-  { type:'bins',          x:5.85,  y:8.55, rot:180 },
+  /* ---- Director Room ---------------------------------------------------- */
+  { type:'exec_desk',     x:8.30,  y:7.30, rot:0   },
+  { type:'exec_chair',    x:8.30,  y:6.35, rot:0   },
+  { type:'conf_chair_lt', x:7.80,  y:8.15, rot:180 },
+  { type:'conf_chair_lt', x:8.80,  y:8.15, rot:180 },
+  { type:'sofa2',         x:7.90,  y:5.30, rot:180 },
+  { type:'side_table',    x:7.05,  y:6.35, rot:0   },
+  { type:'bookcase',      x:7.10,  y:8.45, rot:0   },
 
-  /* ---- client meeting room: a 4-seat room, which is what 9.4 m2 takes --- */
-  { type:'meet_table_4',  x:8.20,  y:1.45, rot:0 },
-  { type:'conf_chair',    x:8.20,  y:0.70, rot:0 },
-  { type:'conf_chair',    x:8.20,  y:2.20, rot:180 },
-  { type:'conf_chair',    x:7.45,  y:1.45, rot:270 },
-  { type:'conf_chair',    x:8.95,  y:1.45, rot:90 },
+  /* ---- Manager ---------------------------------------------------------- */
+  { type:'desk_single',   x:8.60,  y:1.15, rot:270 },
+  { type:'exec_chair',    x:7.85,  y:1.15, rot:270 },
+  { type:'visitor_chair', x:9.30,  y:1.15, rot:90  },
+  { type:'pedestal',      x:8.60,  y:1.92, rot:0   },
 
-  /* ---- director's office ------------------------------------------------ */
-  { type:'exec_desk',     x:8.20,  y:3.60, rot:180 },
-  { type:'exec_chair',    x:8.20,  y:4.60, rot:180 },
-  { type:'conf_chair_lt', x:7.60,  y:3.02, rot:0   },
-  { type:'conf_chair_lt', x:8.80,  y:3.02, rot:0   },
-  { type:'bookcase',      x:7.00,  y:4.45, rot:270 },
-  { type:'side_table',    x:9.55,  y:4.30, rot:0   },
-
-  /* ---- open workstations, in the daylit facade bay ---------------------- */
-  { type:'workstation',     x:7.701, y:6.565, rot:270 },
-  { type:'workstation_std', x:7.701, y:7.715, rot:270 },
-  { type:'workstation',     x:8.451, y:6.565, rot:90  },
-  { type:'workstation',     x:8.451, y:7.715, rot:90  },
-  { type:'screen_120',      x:8.076, y:6.565, rot:90 },
-  { type:'screen_120',      x:8.076, y:7.715, rot:90 },
-  { type:'pedestal',      x:7.680, y:6.055, rot:0 },
-  { type:'pedestal',      x:7.680, y:7.205, rot:0 },
-  { type:'pedestal',      x:8.470, y:6.055, rot:0 },
-  { type:'pedestal',      x:8.470, y:7.205, rot:0 },
-  { type:'task_chair',    x:6.980, y:6.565, rot:270 },
-  { type:'task_chair_dk', x:6.980, y:7.715, rot:270 },
-  { type:'task_chair',    x:9.180, y:6.565, rot:90  },
-  { type:'task_chair_dk', x:9.180, y:7.715, rot:90  },
-  { type:'desk_plant',    x:7.701, y:6.930, rot:0, z:0.740 },
+  /* ---- Finance / Account ------------------------------------------------ */
+  { type:'desk_single',   x:8.60,  y:3.43, rot:270 },
+  { type:'task_chair',    x:7.85,  y:3.43, rot:270 },
+  { type:'visitor_chair', x:9.30,  y:3.43, rot:90  },
+  { type:'pedestal',      x:8.60,  y:2.66, rot:0   },
 ];
 
 
@@ -4196,9 +4124,8 @@ console.log(`Containment check: all furniture inside the parcel → ` +
     `  · narrowest point overall : ${worst.toFixed(2)} m at ` +
     `x = ${at[0].toFixed(2)}, y = ${at[1].toFixed(2)}\n` +
     `  The round column at (${SURVEY.COLUMN.cx}, ${SURVEY.COLUMN.cy}) is measured on ` +
-    `site, so the spine steps around it rather than through it. The two measured ` +
-    `rooms take the southern window bays, so the desks sit in the daylit facade ` +
-    `bay — 3.40 m across, which takes four, not six. See README §6.`);
+    `site. On the proposed plan it stands inside the Director Room, which is ` +
+    `laid out around it. See README §6.`);
 })();
 
 console.log(`Scene built: ${renderer.info.render.triangles || '—'} tris pending, ` +
