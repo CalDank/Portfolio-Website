@@ -449,7 +449,10 @@ const C = {
   WALL_SHADE  : 0xEBE6DE,
   OAK         : 0xC8A87C,  // light oak plank
   OAK_DARK    : 0xA8875C,
-  CARPET      : 0x3A3D42,  // charcoal carpet tile
+  // Measured on site: the whole suite is laid in one mid-brown loop pile.
+  // The brief specified light oak plus charcoal tile; that is a PROPOSED
+  // finish, not what is there. Set FLOOR_AS_BUILT false to see the brief's.
+  CARPET      : 0x8B7B62,
   NAVY        : 0x1B2A4A,  // deep navy accent
   BRASS       : 0xB08D57,  // brushed brass trim
   BLACK_FRAME : 0x1A1C20,  // slim partition framing
@@ -484,14 +487,14 @@ const C = {
    long at 21'1" from the entrance, divided at 8'7½" and again at 8'6½". Only
    the store and pantry walls near the entrance are new work. */
 const ZONES = [
-  { id:'recep',   name:'Reception & Waiting',         brief:14, rect:[0.00, 3.10, 0.00, 4.10],  floor:'oak'    },
+  { id:'recep',   name:'Reception & Waiting',         brief:14, rect:[0.00, 3.10, 0.00, 4.10],  floor:'carpet' },
   { id:'store',   name:'Document & Compliance Store', brief: 7, rect:[0.00, 3.10, 4.10, 6.60],  floor:'carpet' },
-  { id:'pantry',  name:'Pantry Nook',                 brief: 6, rect:[0.00, 2.20, 6.60, 8.839], floor:'oak'    },
-  { id:'flex',    name:'Flex Bay & Phone Booth',      brief: 0, rect:[3.10, 6.426, 0.00, 4.10], floor:'oak'    },
-  { id:'break',   name:'Breakout & Touchdown',        brief: 5, rect:[3.10, 6.426, 6.60, 8.839],floor:'oak'    },
+  { id:'pantry',  name:'Pantry Nook',                 brief: 6, rect:[0.00, 2.20, 6.60, 8.839], floor:'carpet' },
+  { id:'flex',    name:'Flex Bay & Phone Booth',      brief: 0, rect:[3.10, 6.426, 0.00, 4.10], floor:'carpet' },
+  { id:'break',   name:'Breakout & Touchdown',        brief: 5, rect:[3.10, 6.426, 6.60, 8.839],floor:'carpet' },
   { id:'meet',    name:'Client Meeting Room',         brief:14, rect:[6.426,10.008, 0.00, 2.629],floor:'carpet'},
   { id:'dir',     name:"Director's Office",           brief:11, rect:[6.426,10.008, 2.629, 5.436],floor:'carpet'},
-  { id:'open',    name:'Open Workstations',           brief:24, rect:[6.426,10.008, 5.436, 8.839],floor:'oak'  },
+  { id:'open',    name:'Open Workstations',           brief:24, rect:[6.426,10.008, 5.436, 8.839],floor:'carpet'},
 ];
 // Zone rectangles are dimensioned to PARTITION CENTRELINES, the usual space-
 // planning convention; clear internal dims are ~45 mm less on each partitioned
@@ -728,14 +731,61 @@ function concreteCanvas(base){
   return c;
 }
 
+/* --- normal maps ---------------------------------------------------------
+   Every surface here was a flat colour with no normal or roughness detail,
+   which is why carpet, paint and fabric all read like plastic. Deriving a
+   normal map from the same canvas by finite differences costs nothing extra
+   and gives the light something to catch. A proper CC0 PBR set from
+   ambientcg.com would be better still, but it would break the single-file,
+   nothing-to-download promise. --------------------------------------------*/
+function normalFrom(src, strength = 2.0){
+  const w = src.width, h = src.height;
+  const sc = src.getContext('2d').getImageData(0, 0, w, h).data;
+  const out = cvs(w, h), oc = out.getContext('2d');
+  const img = oc.createImageData(w, h), d = img.data;
+  const lum = (x, y) => {
+    const i = (((y + h) % h) * w + ((x + w) % w)) * 4;
+    return (sc[i]*0.299 + sc[i+1]*0.587 + sc[i+2]*0.114) / 255;
+  };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
+    const dx = (lum(x-1, y) - lum(x+1, y)) * strength;
+    const dy = (lum(x, y-1) - lum(x, y+1)) * strength;
+    const len = Math.hypot(dx, dy, 1);
+    const i = (y*w + x) * 4;
+    d[i]   = ((dx/len) * 0.5 + 0.5) * 255;
+    d[i+1] = ((dy/len) * 0.5 + 0.5) * 255;
+    d[i+2] = ((1 /len) * 0.5 + 0.5) * 255;
+    d[i+3] = 255;
+  }
+  oc.putImageData(img, 0, 0);
+  return out;
+}
+/** Same as mkTex but flagged linear — a normal map must not be sRGB-decoded. */
+function mkNormal(c, rx = 1, ry = 1){
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+
+const CARPET_CANVAS = carpetCanvas(C.CARPET, 2);
+const FABRIC_CANVAS = fabricCanvas(C.FABRIC_MID);
+const PAINT_CANVAS  = paintCanvas(C.WALL);
+const OAK_CANVAS    = woodCanvas(C.OAK, C.OAK_DARK, 6);
+
 const TEX = {
-  oak      : mkTex(woodCanvas(C.OAK,      C.OAK_DARK, 6), 3.6, 3.2),
+  carpetN  : mkNormal(normalFrom(CARPET_CANVAS, 3.2), 4.0, 4.0),
+  fabricN  : mkNormal(normalFrom(FABRIC_CANVAS, 2.4), 2, 2),
+  paintN   : mkNormal(normalFrom(PAINT_CANVAS,  1.1), 4, 3),
+  oakN     : mkNormal(normalFrom(OAK_CANVAS,    1.6), 3.6, 3.2),
+  oak      : mkTex(OAK_CANVAS, 3.6, 3.2),
   oakFine  : mkTex(woodCanvas(C.OAK,      C.OAK_DARK, 4), 1.0, 1.0),
   walnut   : mkTex(woodCanvas(0x7A5B3C,   0x4A3524, 4), 1.0, 1.0),
-  carpet   : mkTex(carpetCanvas(C.CARPET, 2), 4.0, 4.0),
-  fabric   : mkTex(fabricCanvas(C.FABRIC_MID), 2, 2),
+  carpet   : mkTex(CARPET_CANVAS, 4.0, 4.0),
+  fabric   : mkTex(FABRIC_CANVAS, 2, 2),
   fabricDk : mkTex(fabricCanvas(C.FABRIC_DK), 2, 2),
-  paint    : mkTex(paintCanvas(C.WALL), 4, 3),
+  paint    : mkTex(PAINT_CANVAS, 4, 3),
   sign     : mkTex(signCanvas(), 1, 1),
   slab     : mkTex(concreteCanvas(C.SLAB), 6, 5),
 };
@@ -743,9 +793,15 @@ const TEX = {
 /* --- 2c. Materials ------------------------------------------------------ */
 const std = o => new THREE.MeshStandardMaterial(o);
 const MAT = {
-  floorOak   : std({ map:TEX.oak,    roughness:0.62, metalness:0.02 }),
-  floorCarp  : std({ map:TEX.carpet, roughness:0.98, metalness:0.00 }),
-  wall       : std({ map:TEX.paint,  color:C.WALL, roughness:0.94 }),
+  floorOak   : std({ map:TEX.oak, normalMap:TEX.oakN,
+                     normalScale:new THREE.Vector2(0.35,0.35),
+                     roughness:0.62, metalness:0.02 }),
+  floorCarp  : std({ map:TEX.carpet, normalMap:TEX.carpetN,
+                     normalScale:new THREE.Vector2(0.85,0.85),
+                     roughness:1.00, metalness:0.00 }),
+  wall       : std({ map:TEX.paint, normalMap:TEX.paintN,
+                     normalScale:new THREE.Vector2(0.18,0.18),
+                     color:C.WALL, roughness:0.94 }),
   wallSide   : std({ color:C.WALL_SHADE, roughness:0.94 }),
   ceiling    : std({ color:C.CEILING, roughness:0.96 }),
   // as-found: 600 x 600 mineral tile on an exposed tee grid, and dark grey
@@ -763,7 +819,9 @@ const MAT = {
   slat       : std({ color:C.TIMBER_SLAT, roughness:0.60 }),
   lam        : std({ color:C.WHITE_LAM, roughness:0.42 }),
   lamDk      : std({ color:0x3C4149, roughness:0.55 }),
-  fabric     : std({ map:TEX.fabric,   color:0xFFFFFF, roughness:0.92 }),
+  fabric     : std({ map:TEX.fabric, normalMap:TEX.fabricN,
+                     normalScale:new THREE.Vector2(0.55,0.55),
+                     color:0xFFFFFF, roughness:0.92 }),
   fabricDk   : std({ map:TEX.fabricDk, color:0xFFFFFF, roughness:0.92 }),
   leather    : std({ color:C.LEATHER, roughness:0.62, metalness:0.03 }),
   glassOut   : new THREE.MeshPhysicalMaterial({
@@ -874,7 +932,9 @@ const W = SURVEY.W, D = SURVEY.D, CH = SURVEY.CEILING;
 
 /* --- 3a. Floors ---------------------------------------------------------
    Oak everywhere, then carpet tile laid over the enclosed rooms. -----------*/
-G_SHELL.add(plane(0, W, 0, D, 0, MAT.floorOak));
+// The suite is carpeted wall to wall. The brief's light oak is a proposed
+// finish; swap MAT.floorCarp for MAT.floorOak here and in ZONES to see it.
+G_SHELL.add(plane(0, W, 0, D, 0, MAT.floorCarp));
 for (const z of ZONES){
   if (z.floor !== 'carpet') continue;
   const [x0,x1,y0,y1] = z.rect;
@@ -1292,7 +1352,7 @@ function credenza(w=1.600, d=0.450, h=0.720){
 /** A planted mass built from many small, thin, tilted leaf blades rather than
     a few big spheres — reads as foliage instead of broccoli, and is still only
     one shared geometry. */
-function foliage(r, h, leaves=26){
+function foliage(r, h, leaves=26, leafMul=1){
   const g = new THREE.Group();
   const leaf = new THREE.IcosahedronGeometry(1, 0);
   const stemGeo = new THREE.CylinderGeometry(0.006, 0.010, 1, 5);
@@ -1301,7 +1361,7 @@ function foliage(r, h, leaves=26){
     const a   = i * 2.399963 + rnd()*0.5;              // golden-angle phyllotaxis
     const rr  = r * (0.18 + 0.82*Math.sqrt(rnd()));
     const zz  = h * (0.16 + 0.84*Math.pow(rnd(), 0.75));
-    const len = r * (0.24 + rnd()*0.22);
+    const len = r * (0.24 + rnd()*0.22) * leafMul;
     const m = new THREE.Mesh(leaf, rnd() > 0.42 ? MAT.plantDk : MAT.plantLt);
     m.scale.set(len, len*0.16, len*0.62);              // flat blade
     m.position.set(Math.cos(a)*rr, zz, Math.sin(a)*rr);
@@ -1873,7 +1933,7 @@ function plantTree(){
   g.add(post(0, 0, potH-0.04, potH-0.02, r*0.96, r*0.96, MAT.soil, 22));
   g.add(post(0, 0, potH-0.01, potH, r*1.02, r*1.02, MAT.pot, 22));
   g.add(post(0, 0, potH-0.03, 1.35, 0.045, 0.028, MAT.walnut, 10));   // trunk
-  const f = foliage(0.62, 0.80, 60); f.position.y = 1.15; g.add(f);
+  const f = foliage(0.58, 0.86, 150, 0.42); f.position.y = 1.02; g.add(f);
   return g;
 }
 function rug(w, d, mat, round = false){
