@@ -63,6 +63,7 @@
     background:rgba(20,24,31,.86);backdrop-filter:blur(10px);
     border:1px solid var(--line);border-radius:10px;padding:10px 16px;
     font-size:12px;color:#CFCABF;transition:opacity .8s;white-space:nowrap}
+  #help .hint{display:block;margin-top:5px;font-size:11px;color:#8E8A82;letter-spacing:.02em}
   #help kbd{display:inline-block;background:rgba(255,255,255,.1);border:1px solid var(--line);
     border-radius:4px;padding:1px 6px;margin:0 2px;font:600 11px/1.5 ui-monospace,monospace;color:#fff}
   #help.hide{opacity:0;pointer-events:none}
@@ -96,6 +97,12 @@
     border-radius:4px;padding:4px 8px 3px}
   .lbl em{display:block;font:400 10px/1.4 ui-monospace,monospace;letter-spacing:.02em;
     text-transform:none;color:#5A6070;font-style:normal;margin-top:1px}
+  /* room names are editable: the overlay stays click-through except for the
+     one label whose field is open, so picking furniture is never blocked */
+  .lbl.editing{pointer-events:auto;border-color:#B08A46;box-shadow:0 0 0 2px rgba(176,138,70,.28)}
+  .lbl .lblEdit{font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;
+    background:transparent;border:0;outline:0;text-align:center;padding:0;
+    width:13ch;max-width:24ch}
   #north{position:absolute;right:26px;top:132px}
   #scalebar{position:absolute;left:26px;bottom:26px;
     font:600 10px/1 "Inter",system-ui,sans-serif;letter-spacing:.08em;color:#20242C;
@@ -336,6 +343,7 @@
   <kbd>E</kbd> edit &nbsp; <kbd>G</kbd> gallery &nbsp; <kbd>M</kbd> measure
   &nbsp;&middot;&nbsp; <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move
   &nbsp;&middot;&nbsp; <kbd>Shift</kbd> run &nbsp;&middot;&nbsp; <kbd>Esc</kbd> release cursor
+  <span class="hint">in the plan, double-click a room name to rename it</span>
 </div>
 
 <div id="readout"></div>
@@ -486,42 +494,86 @@ const C = {
    rooms are exactly the ones on the notebook page: a run of partition 17'10"
    long at 21'1" from the entrance, divided at 8'7½" and again at 8'6½". Only
    the store and pantry walls near the entrance are new work. */
-/* The PROPOSED layout, off the second notebook page. Dimensions on that page:
-   19' + 10' across the top, 15' + 6' + 12' down the right, 23' + 10' down the
-   left, 15' + 14' along the bottom — all of which close on the measured
-   29' x 32'10" shell.
-     19' = 5.791   10' = 3.048   15' = 4.572   6' = 1.829
-     12' = 3.658   23' = 7.010   14' = 4.267                                  */
+/* SCHEME C, 2 Sep 2026 — the compass layout the client asked for.
+   In plan view north is up-screen (plan -Y) and east is right (plan +X), so
+   the surveyed shell reads: entrance wall WEST (x = 0, two doors), glazing
+   EAST (x = 10.008, three punched windows), north edge y = 0.
+
+     · SOUTH   the workstations
+     · NORTH   the two cellular offices, MANAGER on the right (east), so it
+               takes the north-east corner and the first window; the DIRECTOR
+               sits beside it and borrows light through a glazed south wall
+     · NW      the pantry, kept deliberately soft — timber floor, rug, low
+               chair, lamp, planting — with the north entrance door serving it
+     · below the pantry, the MEETING ROOM
+     · below that, open to the office, the WAITING BENCH, which is what the
+               practice has instead of a staffed reception desk; the south
+               entrance door opens straight onto it
+
+   The grid, all to partition centrelines:
+     x = 3.40  east face of the pantry / meeting / waiting column
+     x = 5.00  west wall of the Director's office  (1.50 m clear corridor)
+     x = 7.65  Director | Manager
+     y = 3.40  south wall of the north band
+     y = 6.75  meeting room | waiting bench                                  */
 const ZONES = [
-  { id:'open',    name:'Open Office & Waiting',  brief:24, rect:[0.00, 6.401, 0.00, 5.791],  floor:'carpet' },
-  { id:'mr',      name:'M/R',                    brief:14, rect:[0.00, 4.572, 5.791, 8.839], floor:'carpet' },
-  { id:'filing',  name:'Filing Room',            brief: 7, rect:[4.572, 6.401, 5.791, 8.839],floor:'carpet' },
-  { id:'director',name:'Director Room',          brief:11, rect:[6.401,10.008, 4.572, 8.839],floor:'carpet' },
-  { id:'manager', name:'Manager',                brief: 0, rect:[7.010,10.008, 0.00, 2.286], floor:'carpet' },
-  { id:'finance', name:'Finance / Account',      brief: 0, rect:[7.010,10.008, 2.286, 4.572],floor:'carpet' },
+  { id:'pantry',  name:'Pantry',          brief: 0, rect:[0.00, 3.40, 0.00, 3.40],  floor:'oak'    },
+  { id:'director',name:'Director Room',   brief:11, rect:[5.00, 7.65, 0.00, 3.40],  floor:'carpet' },
+  { id:'manager', name:'Manager',         brief: 0, rect:[7.65,10.008,0.00, 3.40],  floor:'carpet' },
+  { id:'meeting', name:'Meeting Room',    brief:14, rect:[0.00, 3.40, 3.40, 6.75],  floor:'carpet' },
+  { id:'waiting', name:'Waiting Bench',   brief: 0, rect:[0.00, 3.40, 6.75, 8.839], floor:'carpet' },
+  { id:'open',    name:'Open Office',     brief:24, rect:[3.40,10.008,3.40, 8.839], floor:'carpet' },
 ];
 // Zone rectangles are dimensioned to PARTITION CENTRELINES, the usual space-
 // planning convention; clear internal dims are ~45 mm less on each partitioned
 // side. The perimeter walls are built outside the parcel, so the surveyed
-// 93.73 m² is all usable floor.
-// The open-plan work zone is read as 'open' + 'flex' together: the brief asks
-// for ~24 m² and the two bays give 27.7 m² of unenclosed floor either side of
-// the entrance spine.
+// 88.46 m² is all usable floor.
+// The 1.60 m strip at x 3.40 -> 5.00 north of y = 3.40 is deliberately left
+// out of the schedule: it is the corridor off which the pantry, the meeting
+// room and the Director's office are entered, and it reads as circulation,
+// not as floor anyone is given.
+
+/* Room names are the client's words, not the drawing's, so they are editable:
+   double-click a label in the plan and type. They are kept under their own
+   storage key rather than folded into the furniture layout, so renaming a room
+   survives Reset and resetting the furniture does not rename anything. ----- */
+const ZONE_NAME_KEY = 'consensusbiz.roomnames.v1';
+const ROOM_NAME_MAX = 40;
+/** Trim, cap, and drop control characters. Names are rendered with
+    textContent, never innerHTML, so this is tidiness rather than defence. */
+function cleanRoomName(s){
+  let out = '';
+  for (const ch of String(s == null ? '' : s)){
+    const c = ch.codePointAt(0);
+    if (c < 0x20 || c === 0x7F) continue;
+    out += ch;
+    if (out.length >= ROOM_NAME_MAX) break;
+  }
+  return out.trim();
+}
+function applyRoomNames(map){
+  if (!map || typeof map !== 'object') return;
+  for (const z of ZONES){
+    const v = cleanRoomName(map[z.id]);
+    if (v) z.name = v;
+  }
+}
+try { applyRoomNames(JSON.parse(localStorage.getItem(ZONE_NAME_KEY) || 'null')); }
+catch (e){ console.warn('Room names unreadable, using the design:', e.message); }
 
 /* --- 1e. CIRCULATION RULES (checked, not just asserted) ------------------ */
 const CIRC = {
-  SPINE_W       : 1.50,   // entrance -> window wall
-  SPINE_Y0      : 0.15,   // the spine hugs the y = 0 wall, because the main
-  SPINE_Y1      : 1.65,   // door is in the corner, not the middle
+  SPINE_W       : 1.50,   // south entrance -> the corridor
+  SPINE_Y0      : 7.29,   // the entrance leg hugs the south wall, because the
+  SPINE_Y1      : 8.79,   // main door is in the corner, not the middle
   SECONDARY_W   : 1.00,
   SEATED_CLEAR  : 0.90,   // behind every seated chair
-  // The route the spine actually takes: dead straight from the entrance to
-  // x = 6.35, then clear of the north face of the surveyed column (y = 4.90),
-  // south of the window planter, and out to the breakout at the glazing.
-  // Section 9d measures clear width along it. Leg 0 is the straight run.
-  // in through the corner door, east along the y = 0 wall, then north around
-  // the round column and out to the breakout at the window
-  SPINE_ROUTE   : [[0.30, 0.80], [6.60, 0.80], [6.60, 3.40]],
+  // The route the spine actually takes: in through the south-west door, east
+  // past the waiting bench to x = 4.20, then due north up the corridor to the
+  // pantry, meeting-room and Director's doors. Section 9d walks it and
+  // measures the clear width PERPENDICULAR to each leg. Leg 0 is the entrance
+  // run, leg 1 the corridor.
+  SPINE_ROUTE   : [[0.30, 8.04], [4.20, 8.04], [4.20, 1.70]],
 };
 
 /* --- 1f. FURNITURE DIMENSIONS ------------------------------------------- */
@@ -570,7 +622,7 @@ const CAM = {
   FOV         : 62,
   // just inside the entrance, facing the curtain wall down the spine.
   // `yaw` is degrees CCW in plan from +Y, matching the `unit()` convention.
-  START       : { x: 0.85, y: 4.50, yaw: 270 },
+  START       : { x: 0.90, y: 8.04, yaw: 270 },
   ORBIT_TGT   : { x: 5.15, y: 4.55, z: 1.10 },
   TOP_PAD     : 1.30,   // metres of margin around the parcel in top view
 };
@@ -936,14 +988,16 @@ const W = SURVEY.W, D = SURVEY.D, CH = SURVEY.CEILING;
 
 /* --- 3a. Floors ---------------------------------------------------------
    Oak everywhere, then carpet tile laid over the enclosed rooms. -----------*/
-// The suite is carpeted wall to wall. The brief's light oak is a proposed
-// finish; swap MAT.floorCarp for MAT.floorOak here and in ZONES to see it.
+// The suite is carpeted wall to wall — that is what is on site. The one
+// departure is the pantry, where carpet under a coffee machine is a stain
+// waiting to happen: it gets a timber-look plank floor, which is also what
+// makes the corner read warm rather than office-grey. Set its `floor` back to
+// 'carpet' in ZONES to undo that.
 G_SHELL.add(plane(0, W, 0, D, 0, MAT.floorCarp));
 for (const z of ZONES){
-  if (z.floor !== 'carpet') continue;
   const [x0,x1,y0,y1] = z.rect;
-  const p = plane(x0,x1,y0,y1, 0.004, MAT.floorCarp);
-  p.name = 'carpet_' + z.id;
+  const p = plane(x0,x1,y0,y1, 0.004, z.floor === 'oak' ? MAT.floorOak : MAT.floorCarp);
+  p.name = z.floor + '_' + z.id;
   G_SHELL.add(p);
 }
 // No raised floor on site — carpet is laid straight onto the slab — so there
@@ -1109,13 +1163,17 @@ for (const a of SURVEY.WIN_AT){
 }
 addCollider(W-0.05, W+SHELL.WALL_T, -0.2, D+0.2, 0, CH, 'window_wall', 'shell');
 
-/* --- 3f. Structural column (round, ~650 dia at 6.43, 5.44) ---------------
-   The notebook draws it as a circle and the photos confirm it: a plastered
-   round column, not the 600 square the brief described. --------------------*/
+/* --- 3f. Structural column ------------------------------------------------
+   The column is now a LAYOUT ITEM, placed by DEFAULT_LAYOUT at the surveyed
+   position, not built into the shell here.
+
+   It is genuinely structural — it is the one thing in this suite that cannot
+   actually move — but its position was read off a hand sketch by eye, not
+   dimensioned, so being able to nudge it to the truth without a code change is
+   worth more than pretending it is immovable. Treat moving it as correcting
+   the survey, not as a design decision. "Reset" puts it back on the surveyed
+   spot in SURVEY.COLUMN. -------------------------------------------------- */
 const COL = SURVEY.COLUMN;
-G_SHELL.add(post(COL.cx, COL.cy, 0, CH, COL.r, COL.r, MAT.wall, 28));
-addCollider(COL.cx-COL.r, COL.cx+COL.r, COL.cy-COL.r, COL.cy+COL.r, 0, CH,
-            'column', 'shell');
 
 /* --- 3g. Suspended ceiling (2.40 m) --------------------------------------
    600 x 600 mineral tile on an exposed tee grid, as found. -----------------*/
@@ -2066,6 +2124,28 @@ function wallPier(len){
   return g;
 }
 
+/* --- structure -----------------------------------------------------------
+   Columns. Flagged `solid` in the catalogue, which makes furniture clash-check
+   against them the way it does against partitions, while columns themselves
+   are only checked against the shell — a partition meeting a column is a
+   junction, not a clash.
+
+   Their footprint is still a rectangle, so a round column claims its bounding
+   square. That is conservative: it over-reserves the four corners by about
+   110 mm each on a 750 dia. --------------------------------------------------*/
+function columnRound(dia){
+  const g = new THREE.Group(), r = dia/2;
+  g.add(post(0, 0, 0, CH, r, r, MAT.wall, 28));
+  g.add(post(0, 0, 0, SHELL.SKIRTING_H, r*1.03, r*1.03, MAT.lamDk, 28));
+  return g;
+}
+function columnSquare(side){
+  const g = new THREE.Group(), a = side/2;
+  lslab(g, -a, a, -a, a, 0, CH, MAT.wall);
+  lslab(g, -a*1.03, a*1.03, -a*1.03, a*1.03, 0, SHELL.SKIRTING_H, MAT.lamDk);
+  return g;
+}
+
 /* ==========================================================================
    5b. CATALOGUE AND LAYOUT
    --------------------------------------------------------------------------
@@ -2199,100 +2279,149 @@ const CATALOG = {
   wall_pier        : { name:'AV pier',             cat:'Walls', wall:true, len:1.30,
                        foot:[1.30, SHELL.PARTITION_T, CH],
                        make:it=>wallPier(it.len) },
+
+  /* ---- structure ------------------------------------------------------
+     Movable so the surveyed position can be corrected, not because a column
+     can be relocated. See section 3f. ---------------------------------- */
+  column           : { name:'Column, round 750',   cat:'Structure', solid:true,
+                       foot:[0.750, 0.750, CH], make:()=>columnRound(0.750) },
+  column_650       : { name:'Column, round 650',   cat:'Structure', solid:true,
+                       foot:[0.650, 0.650, CH], make:()=>columnRound(0.650) },
+  column_sq        : { name:'Column, square 600',  cat:'Structure', solid:true,
+                       foot:[0.600, 0.600, CH], make:()=>columnSquare(0.600) },
 };
 
 /* ---- The designed fit-out, as data --------------------------------------
    This is the layout the walkthrough opens with and the one "Reset" returns
    to. Editing never touches it; edits live in localStorage. ---------------- */
 const DEFAULT_LAYOUT = [
-  /* ---- partitions, off the proposed sketch ------------------------------
-     y = 5.791 (19')  M/R and Filing Room left wall, run x 0 -> 6.401
-     x = 4.572 (15')  M/R back wall, the Filing Room sits behind it
-     x = 6.401 (21')  Filing / Director line, run y 4.572 -> 8.839
-     y = 4.572 (15')  Director Room left wall
-     x = 7.010 (23')  Manager and Finance front wall
-     y = 2.286        divides Manager from Finance / Account                 */
-  { type:'wall_glazed',       x:2.286, y:5.791, rot:0,  len:4.572, door:0.15 },
-  { type:'wall_solid',        x:5.487, y:5.791, rot:0,  len:1.829, door:0.56 },
-  { type:'wall_solid',        x:4.572, y:7.315, rot:90, len:3.048 },
-  { type:'wall_solid',        x:6.401, y:6.706, rot:90, len:4.267, door:0.12 },
-  { type:'wall_solid',        x:8.176, y:4.572, rot:0,  len:3.550 },
-  { type:'wall_glazed_frost', x:7.010, y:1.143, rot:90, len:2.286, door:0.70 },
-  { type:'wall_glazed_frost', x:7.010, y:3.429, rot:90, len:2.286, door:0.27 },
-  { type:'wall_solid',        x:8.480, y:2.286, rot:0,  len:2.940 },
+  /* ---- structure, at the surveyed position ----------------------------- */
+  { type:'column',            x:SURVEY.COLUMN.cx, y:SURVEY.COLUMN.cy, rot:0 },
 
-  /* ---- open office: waiting by the door, two benches of three ----------- */
-  { type:'sofa2',         x:0.50,  y:3.20, rot:270 },
-  { type:'coffee_table',  x:1.05,  y:3.20, rot:90  },
-  { type:'planter_tall',  x:0.45,  y:4.60, rot:0   },
-  { type:'coat_stand',    x:0.42,  y:2.10, rot:0   },
-  { type:'brochure_rack', x:0.40,  y:1.90, rot:270 },
+  /* ---- partitions ------------------------------------------------------
+     `door` is the fractional position of the 900 mm opening along the run,
+     measured from the low-coordinate end. Everything opens off the corridor
+     at x 3.45 -> 4.95 except the Manager, whose door is on the open office.
+       x = 3.40  pantry east wall, then the meeting room east wall
+       y = 3.40  pantry | meeting, then the north band's south wall
+       y = 6.75  meeting | waiting — the slat feature wall, wordmark facing
+                 south so it is the first thing you see coming in
+       x = 5.00  Director west wall      x = 7.65  Director | Manager      */
+  { type:'wall_solid',        x:3.40,  y:1.70,  rot:90, len:3.40,  door:0.79 },
+  { type:'wall_solid',        x:1.70,  y:3.40,  rot:0,  len:3.40 },
+  { type:'wall_glazed_frost', x:3.40,  y:5.075, rot:90, len:3.35,  door:0.20 },
+  { type:'wall_feature',      x:1.70,  y:6.75,  rot:0,  len:3.40 },
+  { type:'wall_solid',        x:5.00,  y:1.70,  rot:90, len:3.40,  door:0.76 },
+  { type:'wall_glazed',       x:6.325, y:3.40,  rot:0,  len:2.65 },
+  { type:'wall_solid',        x:7.65,  y:1.70,  rot:90, len:3.40 },
+  { type:'wall_solid',        x:8.775, y:3.40,  rot:0,  len:2.250, door:0.16 },
 
-  { type:'desk_single',   x:5.40,  y:2.30, rot:270 },
-  { type:'task_chair',    x:4.70,  y:2.30, rot:270 },
+  /* ---- Pantry, north-west ----------------------------------------------
+     The cosy one. Counter and bins on the north wall under the artwork, tall
+     cupboard and cooler against the corridor wall, a small round table with
+     three stools, and a low chair on a round rug in the corner with a lamp
+     and a plant. The north entrance door lands beside the counter. -------- */
+  { type:'sideboard',     x:2.35,  y:0.28, rot:180 },
+  { type:'bins',          x:0.85,  y:0.21, rot:180 },
+  { type:'artwork',       x:0.13,  y:1.50, rot:90  },
+  { type:'water_cooler',  x:3.10,  y:0.80, rot:0   },
+  { type:'cupboard_tall', x:3.10,  y:1.55, rot:270 },
+  { type:'rug_round',     x:1.55,  y:2.35, rot:0, finish:'sand' },
+  { type:'round_table',   x:2.10,  y:2.10, rot:0   },
+  { type:'stool',         x:1.45,  y:2.10, rot:0   },
+  { type:'stool',         x:2.75,  y:2.10, rot:0   },
+  { type:'stool',         x:2.10,  y:1.45, rot:0   },
+  { type:'armchair',      x:0.60,  y:2.90, rot:270 },
+  { type:'side_table',    x:1.30,  y:3.05, rot:0   },
+  { type:'floor_lamp',    x:0.25,  y:2.20, rot:0   },
+  { type:'planter_md',    x:2.00,  y:3.02, rot:0   },
 
-  { type:'workstation',     x:2.00, y:3.475, rot:0   },
-  { type:'workstation',     x:3.15, y:3.475, rot:0   },
-  { type:'workstation_std', x:4.30, y:3.475, rot:0   },
-  { type:'workstation',     x:2.00, y:4.225, rot:180 },
-  { type:'workstation',     x:3.15, y:4.225, rot:180 },
-  { type:'workstation',     x:4.30, y:4.225, rot:180 },
-  { type:'screen_345',      x:3.15, y:3.850, rot:0   },
-  { type:'task_chair',    x:2.00,  y:2.75, rot:0   },
-  { type:'task_chair_dk', x:3.15,  y:2.75, rot:0   },
-  { type:'task_chair',    x:4.30,  y:2.75, rot:0   },
-  { type:'task_chair',    x:2.00,  y:4.95, rot:180 },
-  { type:'task_chair_dk', x:3.15,  y:4.95, rot:180 },
-  { type:'task_chair',    x:4.30,  y:4.95, rot:180 },
-  { type:'pedestal',      x:1.55,  y:3.50, rot:0 },
-  { type:'pedestal',      x:2.70,  y:3.50, rot:0 },
-  { type:'pedestal',      x:3.85,  y:3.50, rot:0 },
-  { type:'pedestal',      x:1.55,  y:4.20, rot:0 },
-  { type:'pedestal',      x:2.70,  y:4.20, rot:0 },
-  { type:'pedestal',      x:3.85,  y:4.20, rot:0 },
-  { type:'plant_tree',    x:5.80,  y:4.60, rot:0 },
+  /* ---- Director Room, north-centre --------------------------------------
+     No external wall — Manager takes the corner window, as asked — so the
+     south partition is clear glazing and the room borrows light off the open
+     office. Desk faces the door with the credenza behind. ----------------- */
+  { type:'rug_rect',      x:6.30,  y:2.30, rot:0   },
+  { type:'exec_desk',     x:6.40,  y:1.45, rot:0   },
+  { type:'exec_chair',    x:6.40,  y:0.72, rot:0   },
+  { type:'laptop',        x:6.40,  y:1.45, rot:0   },
+  { type:'desk_plant',    x:7.05,  y:1.15, rot:0   },
+  { type:'conf_chair_lt', x:5.90,  y:2.25, rot:180 },
+  { type:'conf_chair_lt', x:6.70,  y:2.25, rot:180 },
+  { type:'credenza',      x:5.30,  y:1.20, rot:90  },
+  { type:'bookcase',      x:7.42,  y:1.30, rot:270 },
+  { type:'planter_sm',    x:7.30,  y:3.05, rot:0   },
+  { type:'artwork',       x:5.90,  y:0.13, rot:0   },
 
-  /* ---- M/R: the sketch draws an oval table with eight seats ------------- */
-  { type:'conf_table_8',  x:2.286, y:7.315, rot:0 },
-  { type:'conf_chair',    x:1.086, y:6.30,  rot:0 },
-  { type:'conf_chair',    x:1.886, y:6.30,  rot:0 },
-  { type:'conf_chair',    x:2.686, y:6.30,  rot:0 },
-  { type:'conf_chair',    x:3.486, y:6.30,  rot:0 },
-  { type:'conf_chair',    x:1.086, y:8.33,  rot:180 },
-  { type:'conf_chair',    x:1.886, y:8.33,  rot:180 },
-  { type:'conf_chair',    x:2.686, y:8.33,  rot:180 },
-  { type:'conf_chair',    x:3.486, y:8.33,  rot:180 },
-  { type:'credenza',      x:0.55,  y:7.315, rot:90 },
-  { type:'tv_stand',      x:4.20,  y:7.315, rot:270 },
+  /* ---- Manager, north-east corner: the first window -------------------- */
+  { type:'desk_single',   x:9.20,  y:1.35, rot:270 },
+  { type:'exec_chair',    x:8.50,  y:1.35, rot:270 },
+  { type:'laptop',        x:9.20,  y:1.35, rot:270 },
+  { type:'pedestal',      x:8.60,  y:2.20, rot:0   },
+  { type:'tambour',       x:7.95,  y:1.20, rot:90  },
+  { type:'visitor_chair', x:8.90,  y:2.70, rot:180 },
+  { type:'visitor_chair', x:9.55,  y:2.70, rot:180 },
+  { type:'planter_sm',    x:7.95,  y:2.60, rot:0   },
+  { type:'artwork',       x:8.60,  y:0.13, rot:0   },
 
-  /* ---- Filing Room ------------------------------------------------------ */
-  { type:'shelving_wide', x:5.55,  y:8.62, rot:0 },
-  { type:'file_cabinet',  x:4.95,  y:6.15, rot:270 },
-  { type:'file_cabinet',  x:4.95,  y:6.65, rot:270 },
-  { type:'file_cabinet',  x:4.95,  y:7.15, rot:270 },
-  { type:'safe',          x:6.05,  y:6.20, rot:90 },
-  { type:'printer_mfd',   x:6.02,  y:7.30, rot:90 },
+  /* ---- Meeting room, mid-west: six seats, screen on the south wall ------ */
+  { type:'conf_table',    x:1.70,  y:5.05, rot:0   },
+  { type:'conf_chair',    x:1.00,  y:4.17, rot:0   },
+  { type:'conf_chair',    x:1.70,  y:4.17, rot:0   },
+  { type:'conf_chair',    x:2.40,  y:4.17, rot:0   },
+  { type:'conf_chair',    x:1.00,  y:5.90, rot:180 },
+  { type:'conf_chair',    x:1.70,  y:5.90, rot:180 },
+  { type:'conf_chair',    x:2.40,  y:5.90, rot:180 },
+  { type:'tv_stand',      x:1.70,  y:6.44, rot:0   },
+  { type:'flipchart',     x:0.40,  y:4.00, rot:0   },
+  { type:'planter_sm',    x:0.30,  y:6.40, rot:0   },
 
-  /* ---- Director Room ---------------------------------------------------- */
-  { type:'exec_desk',     x:8.30,  y:7.30, rot:0   },
-  { type:'exec_chair',    x:8.30,  y:6.35, rot:0   },
-  { type:'conf_chair_lt', x:7.80,  y:8.15, rot:180 },
-  { type:'conf_chair_lt', x:8.80,  y:8.15, rot:180 },
-  { type:'sofa2',         x:7.90,  y:5.30, rot:180 },
-  { type:'side_table',    x:7.05,  y:6.35, rot:0   },
-  { type:'bookcase',      x:7.10,  y:8.45, rot:0   },
+  /* ---- Waiting bench, south-west ----------------------------------------
+     There is no receptionist, so the front of house is a bench against the
+     slat wall, a rug, a coat stand and the literature rack. The 1.50 m
+     entrance route runs south of it — section 9d measures that. ----------- */
+  { type:'rug_rect',      x:2.00,  y:7.85, rot:0   },
+  { type:'bench_uph',     x:2.00,  y:7.03, rot:180 },
+  { type:'brochure_rack', x:0.95,  y:7.03, rot:180 },
+  { type:'coat_stand',    x:0.45,  y:7.05, rot:0   },
+  { type:'planter_sm',    x:3.10,  y:7.05, rot:0   },
 
-  /* ---- Manager ---------------------------------------------------------- */
-  { type:'desk_single',   x:8.60,  y:1.15, rot:270 },
-  { type:'exec_chair',    x:7.85,  y:1.15, rot:270 },
-  { type:'visitor_chair', x:9.30,  y:1.15, rot:90  },
-  { type:'pedestal',      x:8.60,  y:1.92, rot:0   },
+  /* ---- Open office: service band on the north wall, six desks south ----- */
+  { type:'tambour',       x:5.60,  y:3.70, rot:180 },
+  { type:'tambour',       x:6.90,  y:3.70, rot:180 },
+  { type:'printer_mfd',   x:5.30,  y:4.30, rot:0   },
+  { type:'comms_rack',    x:6.10,  y:4.30, rot:0   },
+  { type:'shredder',      x:6.75,  y:4.28, rot:0   },
+  { type:'bins',          x:7.60,  y:4.20, rot:0   },
+  { type:'plant_tree',    x:9.40,  y:4.20, rot:0   },
+  { type:'poseur_table',  x:7.00,  y:5.35, rot:0   },
+  { type:'bar_stool',     x:6.35,  y:5.35, rot:270 },
+  { type:'bar_stool',     x:7.65,  y:5.35, rot:90  },
 
-  /* ---- Finance / Account ------------------------------------------------ */
-  { type:'desk_single',   x:8.60,  y:3.43, rot:270 },
-  { type:'task_chair',    x:7.85,  y:3.43, rot:270 },
-  { type:'visitor_chair', x:9.30,  y:3.43, rot:90  },
-  { type:'pedestal',      x:8.60,  y:2.66, rot:0   },
+  { type:'workstation',     x:5.60, y:6.60, rot:0   },
+  { type:'workstation',     x:6.75, y:6.60, rot:0   },
+  { type:'workstation_std', x:7.90, y:6.60, rot:0   },
+  { type:'workstation',     x:5.60, y:7.35, rot:180 },
+  { type:'workstation',     x:6.75, y:7.35, rot:180 },
+  { type:'workstation',     x:7.90, y:7.35, rot:180 },
+  { type:'screen_345',      x:6.75, y:6.975, rot:0  },
+  { type:'task_chair',    x:5.60,  y:5.88, rot:0   },
+  { type:'task_chair_dk', x:6.75,  y:5.88, rot:0   },
+  { type:'task_chair',    x:7.90,  y:5.88, rot:0   },
+  { type:'task_chair',    x:5.60,  y:8.07, rot:180 },
+  { type:'task_chair_dk', x:6.75,  y:8.07, rot:180 },
+  { type:'task_chair',    x:7.90,  y:8.07, rot:180 },
+  { type:'pedestal',      x:5.60,  y:6.55, rot:0 },
+  { type:'pedestal',      x:6.75,  y:6.55, rot:0 },
+  { type:'pedestal',      x:7.90,  y:6.55, rot:0 },
+  { type:'pedestal',      x:5.60,  y:7.40, rot:0 },
+  { type:'pedestal',      x:6.75,  y:7.40, rot:0 },
+  { type:'pedestal',      x:7.90,  y:7.40, rot:0 },
+  { type:'plant_tree',    x:5.30,  y:8.25, rot:0 },
+
+  /* ---- and a two-chair perch at the glazing, past the column ----------- */
+  { type:'lounge_chair',  x:9.30,  y:6.60, rot:90  },
+  { type:'lounge_chair',  x:9.30,  y:7.60, rot:90  },
+  { type:'side_table',    x:9.35,  y:7.10, rot:0   },
 ];
 
 
@@ -2421,11 +2550,18 @@ function validateLayout(){
   // walls currently are, not against where they were designed. Walls are only
   // checked against the shell — two partitions meeting at a corner is a
   // junction, not a clash.
+  // Partitions AND columns are what furniture has to keep out of. Structure is
+  // itself only checked against the shell: a partition meeting a column is a
+  // junction, not a clash.
   const wallObbs = [];
-  for (const it of LAYOUT) if (CATALOG[it.type]?.wall) wallObbs.push(...obbsOf(it));
+  for (const it of LAYOUT){
+    const d = CATALOG[it.type];
+    if (d && (d.wall || d.solid)) wallObbs.push(...obbsOf(it));
+  }
   const bad = new Set();
   for (const it of LAYOUT){
     const def = CATALOG[it.type]; if (!def) continue;
+    const isStructure = def.wall || def.solid;
     const boxes = itemBoxes(it);
     if (boxes.some(b => b.x0 < -0.002 || b.x1 > W + 0.002 ||
                         b.y0 < -0.002 || b.y1 > D + 0.002)){ bad.add(it.id); continue; }
@@ -2434,7 +2570,7 @@ function validateLayout(){
     for (const A of mine){
       for (const s of shell) if (obbOverlap(A, s)){ hit = true; break; }
       if (hit) break;
-      if (!def.wall) for (const w of wallObbs) if (obbOverlap(A, w)){ hit = true; break; }
+      if (!isStructure) for (const w of wallObbs) if (obbOverlap(A, w)){ hit = true; break; }
       if (hit) break;
     }
     if (hit) bad.add(it.id);
@@ -2559,7 +2695,7 @@ scene.add(hemi);
 
 const sun = new THREE.DirectionalLight(LIGHT.SUN_COLOR, LIGHT.SUN_INT);
 sun.position.set(LIGHT.SUN_DIR.x, LIGHT.SUN_DIR.y, LIGHT.SUN_DIR.z);
-sun.target.position.set(3.4, 0.4, 4.6);
+sun.target.position.set(7.0, 0.4, 6.4);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.near = 4;
@@ -2619,37 +2755,37 @@ function downlight(x, y, intensity = LIGHT.DOWN_INT){
 const PEND_DROP = 0.45;
 
 // recessed modular luminaires on the 600 grid, over the two desk benches
-linearLight(5.70, 8.90, 3.475, 0.075, 4.2);
-linearLight(5.70, 8.90, 4.825, 0.075, 4.2);
-// entrance spine, running east from the main door
-linearLight(0.90, 6.10, 0.90, 0.065, 3.4);
-// reception and waiting
-downlight(1.05, 2.30); downlight(2.55, 2.60); downlight(0.70, 3.60);
-pendant(2.05, 3.20, PEND_DROP);
-// store and pantry
-downlight(0.80, 4.90); downlight(2.40, 5.60); downlight(1.15, 6.30);
-downlight(2.60, 7.10); downlight(3.60, 8.10);
-// flex bay
-downlight(4.60, 1.60); downlight(5.90, 3.00); downlight(3.55, 3.10);
+linearLight(5.05, 8.45, 6.60, 0.075, 4.2);
+linearLight(5.05, 8.45, 7.35, 0.075, 4.2);
+// entrance run, west to east over the waiting bench
+linearLight(0.60, 3.20, 8.10, 0.065, 3.4);
+// the corridor: no linear run will turn the corner, so it is downlit
+downlight(4.20, 1.00); downlight(4.20, 2.30); downlight(4.20, 3.60);
+downlight(4.20, 5.00); downlight(4.20, 6.40); downlight(4.20, 7.80);
+// pantry — one pendant over the table, then a soft wash of the corner
+pendant(2.10, 2.10, PEND_DROP);
+downlight(1.00, 0.70); downlight(2.80, 0.70); downlight(0.80, 2.95);
 // meeting room
-linearLight(7.35, 9.35, 1.80, 0.070, 4.2);
-downlight(7.10, 3.15); downlight(9.55, 3.15);
-downlight(7.10, 0.55); downlight(9.55, 0.55);
-// window breakout
-pendant(9.15, 4.80, PEND_DROP);
-downlight(7.60, 4.60);
-// director's office
-linearLight(7.70, 8.50, 7.35, 0.065, 3.4);
-downlight(9.45, 6.55); downlight(7.15, 8.45); downlight(9.45, 8.45);
-// open work area, general
-downlight(5.70, 6.20); downlight(5.70, 7.60); downlight(3.35, 5.40);
+linearLight(0.60, 2.80, 5.05, 0.070, 4.2);
+downlight(0.70, 3.90); downlight(2.90, 6.30);
+// waiting bench
+downlight(1.00, 7.20); downlight(2.90, 8.30);
+// Director's office
+linearLight(5.50, 7.20, 1.45, 0.065, 3.4);
+downlight(5.40, 2.90); downlight(7.30, 2.90);
+// Manager
+linearLight(8.20, 9.70, 1.35, 0.065, 3.4);
+downlight(8.10, 2.90);
+// open office, general + the perch at the glazing
+downlight(6.00, 4.30); downlight(7.60, 4.30); downlight(9.30, 4.20);
+downlight(6.00, 8.40); downlight(9.30, 6.60); downlight(9.30, 7.80);
+pendant(9.35, 7.10, PEND_DROP);
 
-
-
-// FCU bulkhead: a warm brass-reveal wash grazing the corridor wall
-const wash = new THREE.RectAreaLight(0xFFE3BE, 1.7, 6.2, 0.22);
-wash.position.set(0.55, CH - 0.10, 4.40);
-wash.lookAt(0, 0.9, 4.40);
+// FCU bulkhead: a warm brass-reveal wash grazing the slat feature wall, so
+// the first thing you see on the way in is lit rather than flat
+const wash = new THREE.RectAreaLight(0xFFE3BE, 1.7, 3.2, 0.22);
+wash.position.set(1.70, CH - 0.10, 6.95);
+wash.lookAt(1.70, 0.9, 6.70);
 G_LIGHT.add(wash); rectLights.push(wash);
 
 // reception sign halo lives with the other lights so it survives top view
@@ -2813,9 +2949,14 @@ const LABELS = ZONES.map(z => {
   const el = document.createElement('div');
   el.className = 'lbl';
   const area = (x1-x0)*(y1-y0);
-  el.innerHTML = z.name.replace(/ & /g,' &amp; ') + '<em>' + area.toFixed(1) + ' m²</em>';
+  const nm = document.createElement('span');
+  nm.className = 'nm';
+  nm.textContent = z.name;
+  const em = document.createElement('em');
+  em.textContent = area.toFixed(1) + ' m²';
+  el.append(nm, em);
   elPlan.appendChild(el);
-  return { el, x:(x0+x1)/2, y:(y0+y1)/2, area };
+  return { el, nm, zone:z, x:(x0+x1)/2, y:(y0+y1)/2, area };
 });
 // circulation gets a label too, positioned on the spine
 const circLabel = document.createElement('div');
@@ -2834,10 +2975,78 @@ function layoutLabels(){
     L.el.style.left = sx + 'px';
     L.el.style.top  = sy + 'px';
   }
-  const [cx,cy] = toScreen(4.90, (CIRC.SPINE_Y0+CIRC.SPINE_Y1)/2);
+  const [cx,cy] = toScreen(4.30, 8.45);
   circLabel.style.left = cx + 'px';
   circLabel.style.top  = cy + 'px';
 }
+
+/* --- 8a-ii. Renaming a room ---------------------------------------------
+   The label overlay has pointer-events off so that clicking the plan still
+   picks the furniture underneath a label. Renaming is therefore a double-click
+   on the CANVAS, hit-tested against the label rectangles, and the label is
+   only made clickable for as long as its field is open. ------------------- */
+let renaming = null;
+
+function saveRoomNames(){
+  try {
+    const m = {};
+    for (const z of ZONES) m[z.id] = z.name;
+    localStorage.setItem(ZONE_NAME_KEY, JSON.stringify(m));
+  } catch (e){ console.warn('Room names not saved to this browser:', e.message); }
+}
+function refreshRoomLabels(){
+  for (const L of LABELS) if (L.nm.isConnected) L.nm.textContent = L.zone.name;
+}
+/** Rename one room. Used by the double-click handler and by the tests. */
+function renameZone(id, name){
+  const z = ZONES.find(z => z.id === id); if (!z) return false;
+  const v = cleanRoomName(name); if (!v) return false;
+  z.name = v; saveRoomNames(); refreshRoomLabels();
+  return true;
+}
+function startRename(L){
+  if (renaming) return;
+  const inp = document.createElement('input');
+  inp.className = 'lblEdit';
+  inp.value = L.zone.name;
+  inp.maxLength = ROOM_NAME_MAX;
+  inp.spellcheck = false;
+  L.el.classList.add('editing');
+  L.nm.replaceWith(inp);
+  renaming = L;
+  inp.focus(); inp.select();
+  const finish = keep => {
+    if (renaming !== L) return;
+    renaming = null;
+    if (keep){
+      const v = cleanRoomName(inp.value);
+      if (v && v !== L.zone.name){ L.zone.name = v; saveRoomNames(); }
+    }
+    inp.replaceWith(L.nm);
+    L.nm.textContent = L.zone.name;
+    L.el.classList.remove('editing');
+  };
+  // the global shortcuts already skip form fields, but Escape and Enter are
+  // handled here and must not also reach them
+  inp.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter'){ e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape'){ e.preventDefault(); finish(false); }
+  });
+  inp.addEventListener('blur', () => finish(true));
+}
+renderer.domElement.addEventListener('dblclick', e => {
+  if (MODE !== 'top' || renaming) return;
+  for (const L of LABELS){
+    const r = L.el.getBoundingClientRect();
+    if (e.clientX >= r.left && e.clientX <= r.right &&
+        e.clientY >= r.top  && e.clientY <= r.bottom){
+      e.preventDefault();
+      startRename(L);
+      return;
+    }
+  }
+});
 
 function layoutScaleBar(vh){
   const pxPerM = (innerHeight / vh) * topState.zoom;
@@ -3257,6 +3466,7 @@ function exportLayout(){
     project:'Consensusbiz — Petak 70, Tingkat 20, Menara A',
     parcel:{ w:W, d:D, area:+PARCEL_AREA.toFixed(2) },
     v:1, items:LAYOUT,
+    rooms:Object.fromEntries(ZONES.map(z => [z.id, z.name])),
   }, null, 2)], { type:'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -3276,6 +3486,7 @@ elFile.addEventListener('change', e => {
       if (!items.length) throw new Error('no recognisable furniture in that file');
       pushHistory();
       LAYOUT = items; select(null); renderLayout(); saveLocal();
+      if (parsed && parsed.rooms){ applyRoomNames(parsed.rooms); saveRoomNames(); refreshRoomLabels(); }
     } catch (err){
       console.error('Import failed:', err.message);
       elClash.className = 'bad';
@@ -4045,13 +4256,13 @@ console.log(
   `Zones ${zoneSum.toFixed(2)} m² + circulation ${circArea.toFixed(2)} m²` +
   ` = ${(zoneSum+circArea).toFixed(2)} m² of ${PARCEL_AREA.toFixed(2)} m² → ` +
   (zoneSum + circArea <= PARCEL_AREA + 0.01 ? 'FITS ✔' : 'OVER ✘'));
-const openTotal = ZONES.filter(z=>z.id==='open'||z.id==='flex')
+const openTotal = ZONES.filter(z=>z.id==='open'||z.id==='waiting')
                        .reduce((s,z)=>{const[a,b,c,d]=z.rect; return s+(b-a)*(d-c);},0);
 console.log(
-  `Open-plan work area (desk bay + flex bay) = ${openTotal.toFixed(2)} m² against the ` +
-  `24 m² brief. Measured on site the suite is 88.46 m², not the 93.73 m² the ` +
-  `strata plan implied, so the enclosed rooms were shrunk again rather than the ` +
-  `aisles. See README.md.`);
+  `Unenclosed floor (open office + waiting bench) = ${openTotal.toFixed(2)} m² against ` +
+  `the 24 m² brief. Measured on site the suite is 88.46 m², not the 93.73 m² the ` +
+  `strata plan implied, so the enclosed rooms were shrunk rather than the aisles. ` +
+  `See README.md.`);
 
 /* --- 9c. Clash detection -------------------------------------------------
    No furniture bounding box may intersect a wall, a partition or the column. */
@@ -4098,14 +4309,25 @@ console.log(`Containment check: all furniture inside the parcel → ` +
     const n = Math.max(1, Math.ceil(Math.hypot(bx-ax, by-ay) / 0.02));
     for (let k=0;k<=n;k++) samples.push([ax + (bx-ax)*k/n, ay + (by-ay)*k/n, i]);
   }
+  // A leg is measured ACROSS itself: the entrance run east-west is measured
+  // in y, the corridor north-south in x. Measuring both in y, as this used to,
+  // reported the length of the corridor rather than its width.
+  const vertical = CIRC.SPINE_ROUTE.map((p,i,a) =>
+    i < a.length-1 && Math.abs(a[i+1][0]-p[0]) < Math.abs(a[i+1][1]-p[1]));
   let worst = Infinity, at = null;
   const straight = [], bend = [];
   for (const [x,y,leg] of samples){
-    let lo = 0, hi = D;                            // clear band, at this x, containing y
+    let lo = 0, hi = vertical[leg] ? W : D;      // clear band across the leg
     for (const c of blockers){
-      if (x <= c.x0 || x >= c.x1) continue;
-      if (c.y1 <= y && c.y1 > lo) lo = c.y1;
-      if (c.y0 >= y && c.y0 < hi) hi = c.y0;
+      if (vertical[leg]){
+        if (y <= c.y0 || y >= c.y1) continue;
+        if (c.x1 <= x && c.x1 > lo) lo = c.x1;
+        if (c.x0 >= x && c.x0 < hi) hi = c.x0;
+      } else {
+        if (x <= c.x0 || x >= c.x1) continue;
+        if (c.y1 <= y && c.y1 > lo) lo = c.y1;
+        if (c.y0 >= y && c.y0 < hi) hi = c.y0;
+      }
     }
     const clear = hi - lo;
     (leg === 0 ? straight : bend).push(clear);
@@ -4115,17 +4337,17 @@ console.log(`Containment check: all furniture inside the parcel → ` +
   console.log(
     `Circulation audit along the entrance spine ` +
     `(${R.map(p=>`${p[0]}, ${p[1]}`).join('  →  ')}):\n` +
-    `  · entrance to x = 6.35, dead straight : ${min(straight).toFixed(2)} m clear ` +
+    `  · south door, east past the waiting bench : ${min(straight).toFixed(2)} m clear ` +
     (min(straight) >= CIRC.SPINE_W - 0.005 ? '✔ meets the 1.50 m spine rule'
                                            : '✘ below the 1.50 m spine rule') + '\n' +
-    `  · around the surveyed column to the glazing : ${min(bend).toFixed(2)} m clear ` +
+    `  · north up the corridor to the offices : ${min(bend).toFixed(2)} m clear ` +
     (min(bend) >= CIRC.SECONDARY_W ? '✔ above the 1.00 m secondary-aisle rule'
                                    : '✘ below the 1.00 m secondary-aisle rule') + '\n' +
     `  · narrowest point overall : ${worst.toFixed(2)} m at ` +
     `x = ${at[0].toFixed(2)}, y = ${at[1].toFixed(2)}\n` +
     `  The round column at (${SURVEY.COLUMN.cx}, ${SURVEY.COLUMN.cy}) is measured on ` +
-    `site. On the proposed plan it stands inside the Director Room, which is ` +
-    `laid out around it. See README §6.`);
+    `site. On this scheme it stands in the open office by the glazing, between ` +
+    `the desks and the two lounge chairs. See README §6.`);
 })();
 
 console.log(`Scene built: ${renderer.info.render.triangles || '—'} tris pending, ` +
@@ -4168,8 +4390,15 @@ window.__office = {
   // editor surface, used by the headless checks in _editorcheck.js
   setEditing, select, selectMany, addItem, deleteSelected, duplicateSelected,
   undo, redo, resetLayout, exportLayout, saveLocal, renderLayout,
-  catalog: CATALOG, storeKey: STORE_KEY,
+  catalog: CATALOG, storeKey: STORE_KEY, roomKey: ZONE_NAME_KEY,
   layout: () => LAYOUT,
+  zones:  () => ZONES.map(z => ({ id:z.id, name:z.name })),
+  renameZone,
+  /** double-click at the centre of a room's label, as a person would */
+  editRoomLabel(id){
+    const L = LABELS.find(l => l.zone.id === id); if (!L) return false;
+    startRename(L); return true;
+  },
   tape: { on:setMeasuring, clear:clearTape,
           add(x,y){ tapePts.push({x,y}); refreshTape(); },
           pts:()=>tapePts, snap:(x,y)=>snapTape({x,y}, ...worldToScreen(x,y)),
