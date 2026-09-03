@@ -4176,9 +4176,13 @@ async function publishLayout(){
   btn.disabled = true;
   elPubMsg.className = ''; elPubMsg.textContent = 'Publishing…';
   try {
+    // Partitions carry a length and a door position and any piece may carry a
+    // finish; the server sanitises all three. Sending only the pose used to
+    // turn every published wall into a doorless 3 m default run.
     const r = await api('/publish', { method:'POST',
       body: JSON.stringify({ title, author,
-        items: LAYOUT.map(({ type, x, y, rot, z }) => ({ type, x, y, rot, z })) }) });
+        items: LAYOUT.map(({ type, x, y, rot, z, len, door, finish }) =>
+                          ({ type, x, y, rot, z, len, door, finish })) }) });
     try { localStorage.setItem(GALLERY.NAME_KEY, author); } catch {}
     loadedId = r.id;
     elPubMsg.className = 'ok';
